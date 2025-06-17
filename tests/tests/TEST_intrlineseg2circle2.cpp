@@ -1,10 +1,8 @@
-#include <gmock/gmock.h>
-
-#include <gtest/gtest.h>
-
+﻿#include <algorithm>
 #include <cavc/intrlineseg2circle2.hpp>
 #include <cavc/mathutils.hpp>
 #include <cavc/vector2.hpp>
+#include <gtest/gtest.h>
 
 using Vector2 = cavc::Vector2<double>;
 using IntrLineSeg2Circle2Result = cavc::IntrLineSeg2Circle2Result<double>;
@@ -14,10 +12,6 @@ namespace {
 // Helper function to check if two doubles are approximately equal
 constexpr double EPSILON = 1e-9;
 bool approxEqual(double a, double b, double epsilon = EPSILON) { return std::abs(a - b) < epsilon; }
-
-bool approxEqual(const Vector2 &a, const Vector2 &b, double epsilon = EPSILON) {
-  return approxEqual(a.x(), b.x(), epsilon) && approxEqual(a.y(), b.y(), epsilon);
-}
 
 // Helper function to get point on segment using parametric t
 Vector2 getPointOnSegment(const Vector2 &p0, const Vector2 &p1, double t) {

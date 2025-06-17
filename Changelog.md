@@ -19,6 +19,6 @@
   - TEST_plinesegment
   - TEST_pline
 - polyline: handle empty input in function convertArcsToLines
-
+- Add coverage for tests(gcc/clang)
 
 
