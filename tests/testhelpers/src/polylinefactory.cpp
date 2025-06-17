@@ -1,4 +1,5 @@
 #include "polylinefactory.hpp"
+#include <algorithm>
 #include <cmath>
 
 static cavc_point pointOnCircle(cavc_real radius, cavc_point center, cavc_real angle) {

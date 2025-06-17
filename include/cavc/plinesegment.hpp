@@ -130,6 +130,9 @@ SplitResult<Real> splitAtPoint(PlineVertex<Real> const &v1, PlineVertex<Real> co
   return result;
 }
 
+/// Compute the tangent vector at a point on a segment defined by v1 to v2.
+/// If the segment is an arc, the tangent vector is perpendicular to the radius at the point on the
+/// arc.
 template <typename Real>
 Vector2<Real> segTangentVector(PlineVertex<Real> const &v1, PlineVertex<Real> const &v2,
                                Vector2<Real> const &pointOnSeg) {
@@ -306,6 +309,7 @@ template <typename Real> struct IntrPlineSegsResult {
   Vector2<Real> point2;
 };
 
+/// Compute the intersection of two line segments or two arcs.
 template <typename Real>
 IntrPlineSegsResult<Real> intrPlineSegs(PlineVertex<Real> const &v1, PlineVertex<Real> const &v2,
                                         PlineVertex<Real> const &u1, PlineVertex<Real> const &u2) {

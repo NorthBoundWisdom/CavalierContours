@@ -1,7 +1,7 @@
 #include "casebuilder.hpp"
 
-std::vector<cavc_vertex> CaseBuilder::simpleRectangle() {
-  std::vector<cavc_vertex> result;
+std::vector<PlineVertex> CaseBuilder::simpleRectangle() {
+  std::vector<PlineVertex> result;
   result.reserve(4);
 
   result.push_back({0, 0, 0});
@@ -12,8 +12,8 @@ std::vector<cavc_vertex> CaseBuilder::simpleRectangle() {
   return result;
 }
 
-std::vector<cavc_vertex> CaseBuilder::offsetCase() {
-  std::vector<cavc_vertex> res;
+std::vector<PlineVertex> CaseBuilder::offsetCase() {
+  std::vector<PlineVertex> res;
   res.push_back({0, 25, 1});
   res.push_back({0, 0, 0});
   res.push_back({2, 0, 1});
@@ -28,15 +28,15 @@ std::vector<cavc_vertex> CaseBuilder::offsetCase() {
   return res;
 }
 
-std::vector<cavc_vertex> CaseBuilder::twoBadArcCase() {
-  std::vector<cavc_vertex> res;
+std::vector<PlineVertex> CaseBuilder::twoBadArcCase() {
+  std::vector<PlineVertex> res;
   res.push_back({0, 0.5, -0.618033988749895});
   res.push_back({4, 0.5, -0.5});
   return res;
 }
 
-std::vector<cavc_vertex> CaseBuilder::figureEightCase() {
-  std::vector<cavc_vertex> res;
+std::vector<PlineVertex> CaseBuilder::figureEightCase() {
+  std::vector<PlineVertex> res;
   res.push_back({0, 0, 1});
   res.push_back({2, 0, 1});
   res.push_back({0, 0, -1});
@@ -44,8 +44,8 @@ std::vector<cavc_vertex> CaseBuilder::figureEightCase() {
   return res;
 }
 
-std::vector<cavc_vertex> CaseBuilder::complexSelfInterectCase() {
-  std::vector<cavc_vertex> res;
+std::vector<PlineVertex> CaseBuilder::complexSelfInterectCase() {
+  std::vector<PlineVertex> res;
   res.push_back({0, 25, 1.995510113000107});
   res.push_back({6.684425313612419, 16.05394554133331, 0});
   res.push_back({-2.468698351579587, 15.973654982866707, 8.639429900629425});
@@ -60,8 +60,8 @@ std::vector<cavc_vertex> CaseBuilder::complexSelfInterectCase() {
   return res;
 }
 
-std::vector<cavc_vertex> CaseBuilder::closedLineArcCase() {
-  std::vector<cavc_vertex> res;
+std::vector<PlineVertex> CaseBuilder::closedLineArcCase() {
+  std::vector<PlineVertex> res;
   res.push_back({5, 5, 0});
   res.push_back({3, 9, 0});
   res.push_back({0, 10, 0});
@@ -70,33 +70,33 @@ std::vector<cavc_vertex> CaseBuilder::closedLineArcCase() {
   return res;
 }
 
-std::vector<cavc_vertex> CaseBuilder::quarterArcCase() {
-  std::vector<cavc_vertex> res;
+std::vector<PlineVertex> CaseBuilder::quarterArcCase() {
+  std::vector<PlineVertex> res;
   res.push_back({1, 0, -0.414213562373095});
   res.push_back({0, -1, 0.00});
   return res;
 }
 
-std::vector<cavc_vertex> CaseBuilder::positiveCircle() {
-  std::vector<cavc_vertex> data1;
+std::vector<PlineVertex> CaseBuilder::positiveCircle() {
+  std::vector<PlineVertex> data1;
   data1.push_back({0, 0, 1});
   data1.push_back({10, 0, 1});
   return data1;
 }
 
-std::vector<cavc_vertex> CaseBuilder::negativeCircle() {
-  std::vector<cavc_vertex> data1;
+std::vector<PlineVertex> CaseBuilder::negativeCircle() {
+  std::vector<PlineVertex> data1;
   data1.push_back({0, 0, -1});
   data1.push_back({10, 0, -1});
   return data1;
 }
 
-std::vector<std::vector<cavc_vertex>> CaseBuilder::simpleBoolCase() {
-  std::vector<cavc_vertex> data1;
+std::vector<std::vector<PlineVertex>> CaseBuilder::simpleBoolCase() {
+  std::vector<PlineVertex> data1;
   data1.push_back({0, 1, 1});
   data1.push_back({10, 1, 1});
 
-  std::vector<cavc_vertex> data2;
+  std::vector<PlineVertex> data2;
   data2.push_back({3, -10, 0});
   data2.push_back({6, -10, 0});
   data2.push_back({6, 10, 0});

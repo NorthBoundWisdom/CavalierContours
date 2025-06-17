@@ -21,9 +21,13 @@ macro(cavc_add_test name)
     gtest_add_tests(TARGET ${name} WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
 endmacro()
 
-cavc_add_test(TEST_sample)
-cavc_add_test(TEST_cavc_pline)
-cavc_add_test(TEST_cavc_pline_function)
-cavc_add_test(TEST_cavc_parallel_offset)
-cavc_add_test(TEST_cavc_combine_plines)
+# C API tests
+cavc_add_test(TEST_capi_pline)
+cavc_add_test(TEST_capi_pline_function)
+cavc_add_test(TEST_capi_parallel_offset)
+cavc_add_test(TEST_capi_combine_plines)
+
+# C++ API tests
+cavc_add_test(TEST_plinesegment)
+cavc_add_test(TEST_pline)
 cavc_add_test(TEST_staticspatialindex)

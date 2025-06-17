@@ -2,6 +2,7 @@
 #define CAVC_POLYLINEFACTORY_HPP
 
 #include "cavaliercontours.h"
+
 #include <memory>
 #include <vector>
 

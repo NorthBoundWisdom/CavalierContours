@@ -1,24 +1,30 @@
 #ifndef CAVC_CASEBUILDER_HPP
 #define CAVC_CASEBUILDER_HPP
 
-#include "cavaliercontours.h"
+#include <cavc/plinesegment.hpp>
 #include <vector>
 
+using PlineVertex = cavc::PlineVertex<double>;
 class CaseBuilder {
-  static std::vector<cavc_vertex> simpleRectangle();
+public:
+  static std::vector<PlineVertex> simpleRectangle();
 
-  static std::vector<cavc_vertex> twoBadArcCase();
+  static std::vector<PlineVertex> twoBadArcCase();
 
-  static std::vector<cavc_vertex> figureEightCase();
+  static std::vector<PlineVertex> figureEightCase();
 
-  static std::vector<cavc_vertex> complexSelfInterectCase();
+  static std::vector<PlineVertex> complexSelfInterectCase();
 
-  static std::vector<cavc_vertex> closedLineArcCase();
-  static std::vector<cavc_vertex> offsetCase();
-  static std::vector<cavc_vertex> quarterArcCase();
-  static std::vector<cavc_vertex> positiveCircle();
-  static std::vector<cavc_vertex> negativeCircle();
+  static std::vector<PlineVertex> closedLineArcCase();
 
-  static std::vector<std::vector<cavc_vertex>> simpleBoolCase();
+  static std::vector<PlineVertex> offsetCase();
+
+  static std::vector<PlineVertex> quarterArcCase();
+
+  static std::vector<PlineVertex> positiveCircle();
+
+  static std::vector<PlineVertex> negativeCircle();
+
+  static std::vector<std::vector<PlineVertex>> simpleBoolCase();
 };
 #endif // CAVC_CASEBUILDER_HPP

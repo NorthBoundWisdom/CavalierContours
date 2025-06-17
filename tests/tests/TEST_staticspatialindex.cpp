@@ -3,8 +3,9 @@
 
 #include <gtest/gtest.h>
 
-#include "cavc/staticspatialindex.hpp"
 #include "testhelpers.hpp"
+
+#include <cavc/staticspatialindex.hpp>
 
 namespace t = testing;
 
