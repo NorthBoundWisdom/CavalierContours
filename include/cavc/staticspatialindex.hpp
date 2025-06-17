@@ -82,8 +82,32 @@ public:
     Real width = m_maxX - m_minX;
     Real height = m_maxY - m_minY;
     std::unique_ptr<std::uint32_t[]> hilbertValues(new std::uint32_t[m_numItems]);
+    // hilbert max input value for x and y
+    const Real hilbertMax = static_cast<Real>((1u << 16) - 1u);
 
     std::size_t pos = 0;
+
+    // convert coordinate to hilbert space while guarding against degenerate extents
+    auto quantize = [&](Real minCoord, Real maxCoord, Real extent, Real extentMin) {
+      if (extent <= Real(0)) {
+        return static_cast<std::uint32_t>(0);
+      }
+
+      Real value = std::floor(hilbertMax * ((minCoord + maxCoord) / Real(2) - extentMin) / extent);
+      if (!std::isfinite(value)) {
+        return static_cast<std::uint32_t>(0);
+      }
+
+      if (value < Real(0)) {
+        return static_cast<std::uint32_t>(0);
+      }
+
+      if (value > hilbertMax) {
+        return static_cast<std::uint32_t>(hilbertMax);
+      }
+
+      return static_cast<std::uint32_t>(value);
+    };
 
     for (std::size_t i = 0; i < m_numItems; ++i) {
       pos = 4 * i;
@@ -92,16 +116,9 @@ public:
       Real maxX = m_boxes[pos++];
       Real maxY = m_boxes[pos++];
 
-      // hilbert max input value for x and y
-      const Real hilbertMax = static_cast<Real>((1 << 16) - 1);
-      // mapping the x and y coordinates of the center of the box to values in the range
-      // [0 -> n - 1] such that the min of the entire set of bounding boxes maps to 0 and the max of
-      // the entire set of bounding boxes maps to n - 1 our 2d space is x: [0 -> n-1] and
-      // y: [0 -> n-1], our 1d hilbert curve value space is d: [0 -> n^2 - 1]
-      Real x = std::floor(hilbertMax * ((minX + maxX) / 2 - m_minX) / width);
-      std::uint32_t hx = static_cast<std::uint32_t>(x);
-      Real y = std::floor(hilbertMax * ((minY + maxY) / 2 - m_minY) / height);
-      std::uint32_t hy = static_cast<std::uint32_t>(y);
+      // map box center to hilbert coordinates in [0, hilbertMax]
+      std::uint32_t hx = quantize(minX, maxX, width, m_minX);
+      std::uint32_t hy = quantize(minY, maxY, height, m_minY);
       hilbertValues[i] = hilbertXYToIndex(hx, hy);
     }
 

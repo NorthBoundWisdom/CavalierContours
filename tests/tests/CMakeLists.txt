@@ -1,7 +1,12 @@
 cmake_minimum_required(VERSION 3.21)
 
+set(gtesthelper
+    ${CMAKE_CURRENT_SOURCE_DIR}/c_api_test_helpers.hpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/testhelpers.hpp
+)
+
 macro(cavc_add_test name)
-    add_executable(${name} ${name}.cpp)
+    add_executable(${name} ${name}.cpp ${gtesthelper})
 
     target_include_directories(${name}
     PRIVATE
@@ -18,19 +23,16 @@ macro(cavc_add_test name)
         GTest::gtest
         GTest::gmock)
 
-    gtest_add_tests(TARGET ${name} WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
+    gtest_discover_tests(${name}
+        WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+        DISCOVERY_MODE PRE_TEST)
 endmacro()
 
-# C API tests
-cavc_add_test(TEST_capi_pline)
-cavc_add_test(TEST_capi_pline_function)
-cavc_add_test(TEST_capi_parallel_offset)
-cavc_add_test(TEST_capi_combine_plines)
-
-# C++ API tests
-cavc_add_test(TEST_plinesegment)
-cavc_add_test(TEST_intrcircle2circle2)
-cavc_add_test(TEST_intrlineseg2circle2)
-cavc_add_test(TEST_intrlineseg2lineseg2)
-cavc_add_test(TEST_pline)
+cavc_add_test(TEST_sample)
+cavc_add_test(TEST_cavc_pline)
+cavc_add_test(TEST_cavc_pline_function)
+cavc_add_test(TEST_cavc_parallel_offset)
+cavc_add_test(TEST_cavc_combine_plines)
 cavc_add_test(TEST_staticspatialindex)
+cavc_add_test(TEST_cavc_api_regression)
+cavc_add_test(TEST_cavc_offset_islands)

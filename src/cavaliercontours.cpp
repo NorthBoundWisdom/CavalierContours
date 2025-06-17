@@ -1,7 +1,9 @@
 #include "cavaliercontours.h"
 #include "cavc/polylinecombine.hpp"
 #include "cavc/polylineoffset.hpp"
+#include "cavc/polylineoffsetislands.hpp"
 #include <iostream>
+#include <limits>
 #include <memory>
 #include <span>
 
@@ -23,6 +25,77 @@ struct cavc_pline {
 struct cavc_pline_list {
   std::vector<std::unique_ptr<cavc_pline>> data;
 };
+
+struct cavc_spatial_index {
+  cavc::StaticSpatialIndex<cavc_real> data;
+  uint32_t item_count;
+  cavc_spatial_index(cavc::StaticSpatialIndex<cavc_real> &&p_data, uint32_t p_item_count) noexcept
+      : data(std::move(p_data)), item_count(p_item_count) {}
+};
+
+struct cavc_offset_loop_topology {
+  std::vector<cavc_offset_loop_topology_node> nodes;
+};
+
+static cavc_tolerances to_api_tolerances(cavc::utils::EpsilonConfig<cavc_real> const &config) {
+  return {config.realThreshold, config.realPrecision, config.sliceJoinThreshold,
+          config.offsetThreshold};
+}
+
+static cavc::utils::EpsilonConfig<cavc_real> to_cpp_tolerances(cavc_tolerances const &config) {
+  return {config.real_threshold, config.real_precision, config.slice_join_threshold,
+          config.offset_threshold};
+}
+
+static cavc::ClosedPolylineWinding to_cpp_closed_winding(cavc_closed_winding winding) {
+  switch (winding) {
+  case CAVC_WINDING_KEEP:
+    return cavc::ClosedPolylineWinding::Keep;
+  case CAVC_WINDING_COUNTER_CLOCKWISE:
+    return cavc::ClosedPolylineWinding::CounterClockwise;
+  case CAVC_WINDING_CLOCKWISE:
+    return cavc::ClosedPolylineWinding::Clockwise;
+  }
+  CAVC_ASSERT(false, "Unhandled closed winding enum");
+  return cavc::ClosedPolylineWinding::Keep;
+}
+
+static cavc::OffsetJoinType to_cpp_offset_join_type(cavc_offset_join_type join_type) {
+  switch (join_type) {
+  case CAVC_OFFSET_JOIN_ROUND:
+    return cavc::OffsetJoinType::Round;
+  case CAVC_OFFSET_JOIN_MITER:
+    return cavc::OffsetJoinType::Miter;
+  case CAVC_OFFSET_JOIN_BEVEL:
+    return cavc::OffsetJoinType::Bevel;
+  }
+  CAVC_ASSERT(false, "Unhandled offset join enum");
+  return cavc::OffsetJoinType::Round;
+}
+
+static cavc::OffsetEndCapType to_cpp_offset_end_cap_type(cavc_offset_end_cap_type end_cap_type) {
+  switch (end_cap_type) {
+  case CAVC_OFFSET_END_CAP_ROUND:
+    return cavc::OffsetEndCapType::Round;
+  case CAVC_OFFSET_END_CAP_SQUARE:
+    return cavc::OffsetEndCapType::Square;
+  case CAVC_OFFSET_END_CAP_BUTT:
+    return cavc::OffsetEndCapType::Butt;
+  }
+  CAVC_ASSERT(false, "Unhandled offset end cap enum");
+  return cavc::OffsetEndCapType::Round;
+}
+
+static cavc::ParallelOffsetOptions<cavc_real>
+to_cpp_parallel_offset_options(cavc_parallel_offset_options const &options) {
+  CAVC_ASSERT(options.miter_limit >= cavc_real(1), "miter_limit must be >= 1");
+  cavc::ParallelOffsetOptions<cavc_real> result;
+  result.hasSelfIntersects = options.may_have_self_intersects != 0;
+  result.joinType = to_cpp_offset_join_type(options.join_type);
+  result.endCapType = to_cpp_offset_end_cap_type(options.end_cap_type);
+  result.miterLimit = options.miter_limit;
+  return result;
+}
 
 // helper to move vector of plines to cavc_pline_list
 static void move_to_list(std::vector<cavc::Polyline<cavc_real>> &&plines, cavc_pline_list *list) {
@@ -60,6 +133,60 @@ static void copy_to_vertex_data(cavc_pline const *api_pline, cavc_vertex *vertex
       output_span[i] = cavc_vertex{v.x(), v.y(), v.bulge()};
     }
   }
+}
+
+static std::vector<std::size_t> query_spatial_index(cavc_spatial_index const *spatial_index,
+                                                    cavc_real min_x, cavc_real min_y,
+                                                    cavc_real max_x, cavc_real max_y) {
+  std::vector<std::size_t> results;
+  spatial_index->data.query(min_x, min_y, max_x, max_y, results);
+  return results;
+}
+
+static cavc_offset_loop_role to_api_offset_loop_role(cavc::OffsetLoopRole role) {
+  switch (role) {
+  case cavc::OffsetLoopRole::Outer:
+    return CAVC_OFFSET_LOOP_ROLE_OUTER;
+  case cavc::OffsetLoopRole::Hole:
+    return CAVC_OFFSET_LOOP_ROLE_HOLE;
+  }
+  CAVC_ASSERT(false, "Unhandled offset loop role");
+  return CAVC_OFFSET_LOOP_ROLE_OUTER;
+}
+
+static cavc_offset_loop_topology_node
+to_api_topology_node(cavc::OffsetLoopTopologyNode<cavc_real> const &node) {
+  CAVC_ASSERT(node.sourceIndex <= std::numeric_limits<uint32_t>::max(),
+              "source index exceeds uint32_t");
+
+  uint32_t parent_index = CAVC_OFFSET_LOOP_NO_PARENT;
+  if (node.parentIndex != cavc::kNoParentOffsetLoop) {
+    CAVC_ASSERT(node.parentIndex <= std::numeric_limits<uint32_t>::max(),
+                "parent index exceeds uint32_t");
+    parent_index = static_cast<uint32_t>(node.parentIndex);
+  }
+
+  return {to_api_offset_loop_role(node.role), static_cast<uint32_t>(node.sourceIndex),
+          parent_index};
+}
+
+static std::vector<cavc::OffsetLoop<cavc_real>> to_cpp_offset_loops(cavc_pline const *const *loops,
+                                                                    uint32_t loop_count) {
+  CAVC_ASSERT(loop_count == 0 || loops != nullptr, "non-zero loop count requires loop pointer");
+
+  std::vector<cavc::OffsetLoop<cavc_real>> result;
+  result.reserve(loop_count);
+
+  for (uint32_t i = 0; i < loop_count; ++i) {
+    CAVC_ASSERT(loops[i] != nullptr, "null loop pointer not allowed");
+    auto const &loop = loops[i]->data;
+    CAVC_ASSERT(loop.isClosed(), "offset topology requires closed loops");
+    CAVC_ASSERT(loop.size() > 1, "offset topology requires loops with at least 2 vertices");
+
+    result.push_back({static_cast<std::size_t>(i), loop, cavc::createApproxSpatialIndex(loop)});
+  }
+
+  return result;
 }
 
 cavc_pline *cavc_pline_new(const cavc_vertex *vertex_data, uint32_t vertex_count, int is_closed) {
@@ -156,6 +283,41 @@ void cavc_pline_set_is_closed(cavc_pline *pline, int is_closed) {
   CAVC_END_TRY_CATCH
 }
 
+void cavc_pline_invert_direction(cavc_pline *pline) {
+  CAVC_ASSERT(pline, "null pline not allowed");
+  CAVC_BEGIN_TRY_CATCH
+  cavc::invertDirection(pline->data);
+  CAVC_END_TRY_CATCH
+}
+
+void cavc_pline_prune_singularities(cavc_pline const *pline, cavc_real epsilon,
+                                    cavc_pline **output) {
+  CAVC_ASSERT(pline, "null pline not allowed");
+  CAVC_ASSERT(output, "null output not allowed");
+  CAVC_BEGIN_TRY_CATCH
+  *output = new cavc_pline(cavc::pruneSingularities(pline->data, epsilon));
+  CAVC_END_TRY_CATCH
+}
+
+void cavc_pline_convert_arcs_to_lines(cavc_pline const *pline, cavc_real error,
+                                      cavc_pline **output) {
+  CAVC_ASSERT(pline, "null pline not allowed");
+  CAVC_ASSERT(output, "null output not allowed");
+  CAVC_BEGIN_TRY_CATCH
+  *output = new cavc_pline(cavc::convertArcsToLines(pline->data, error));
+  CAVC_END_TRY_CATCH
+}
+
+void cavc_pline_normalize(cavc_pline const *pline, cavc_real epsilon,
+                          cavc_closed_winding closed_winding, cavc_pline **output) {
+  CAVC_ASSERT(pline, "null pline not allowed");
+  CAVC_ASSERT(output, "null output not allowed");
+  CAVC_BEGIN_TRY_CATCH
+  auto winding = to_cpp_closed_winding(closed_winding);
+  *output = new cavc_pline(cavc::normalizePolyline(pline->data, epsilon, winding));
+  CAVC_END_TRY_CATCH
+}
+
 void cavc_pline_list_delete(cavc_pline_list *pline_list) {
   CAVC_BEGIN_TRY_CATCH
   delete pline_list;
@@ -187,13 +349,114 @@ cavc_pline *cavc_pline_list_release(cavc_pline_list *pline_list, uint32_t index)
   CAVC_END_TRY_CATCH
 }
 
+// cavc_spatial_index APIs
+// -------------------------
+cavc_spatial_index *cavc_spatial_index_create(cavc_pline const *pline) {
+  CAVC_ASSERT(pline, "null pline not allowed");
+  CAVC_ASSERT(pline->data.size() > 1,
+              "need at least 2 vertexes to form segments for spatial index");
+  CAVC_BEGIN_TRY_CATCH
+  uint32_t segment_count =
+      static_cast<uint32_t>(pline->data.isClosed() ? pline->data.size() : pline->data.size() - 1);
+  return new cavc_spatial_index(cavc::createApproxSpatialIndex(pline->data), segment_count);
+  CAVC_END_TRY_CATCH
+}
+
+void cavc_spatial_index_delete(cavc_spatial_index *spatial_index) {
+  CAVC_BEGIN_TRY_CATCH
+  delete spatial_index;
+  CAVC_END_TRY_CATCH
+}
+
+uint32_t cavc_spatial_index_item_count(cavc_spatial_index const *spatial_index) {
+  CAVC_ASSERT(spatial_index, "null spatial_index not allowed");
+  CAVC_BEGIN_TRY_CATCH
+  return spatial_index->item_count;
+  CAVC_END_TRY_CATCH
+}
+
+uint32_t cavc_spatial_index_query_count(cavc_spatial_index const *spatial_index, cavc_real min_x,
+                                        cavc_real min_y, cavc_real max_x, cavc_real max_y) {
+  CAVC_ASSERT(spatial_index, "null spatial_index not allowed");
+  CAVC_BEGIN_TRY_CATCH
+  auto results = query_spatial_index(spatial_index, min_x, min_y, max_x, max_y);
+  return static_cast<uint32_t>(results.size());
+  CAVC_END_TRY_CATCH
+}
+
+void cavc_spatial_index_query(cavc_spatial_index const *spatial_index, cavc_real min_x,
+                              cavc_real min_y, cavc_real max_x, cavc_real max_y,
+                              uint32_t *results_out) {
+  CAVC_ASSERT(spatial_index, "null spatial_index not allowed");
+  CAVC_ASSERT(results_out, "null results_out not allowed");
+  CAVC_BEGIN_TRY_CATCH
+  auto results = query_spatial_index(spatial_index, min_x, min_y, max_x, max_y);
+  for (std::size_t i = 0; i < results.size(); ++i) {
+    results_out[i] = static_cast<uint32_t>(results[i]);
+  }
+  CAVC_END_TRY_CATCH
+}
+
+cavc_offset_loop_topology *cavc_offset_loop_topology_build(cavc_pline const *const *ccw_loops,
+                                                           uint32_t ccw_loop_count,
+                                                           cavc_pline const *const *cw_loops,
+                                                           uint32_t cw_loop_count,
+                                                           cavc_real boundary_epsilon) {
+  CAVC_ASSERT(boundary_epsilon >= cavc_real(0), "boundary_epsilon must be >= 0");
+  CAVC_BEGIN_TRY_CATCH
+  cavc::OffsetLoopSet<cavc_real> loop_set;
+  loop_set.ccwLoops = to_cpp_offset_loops(ccw_loops, ccw_loop_count);
+  loop_set.cwLoops = to_cpp_offset_loops(cw_loops, cw_loop_count);
+
+  auto cpp_topology = cavc::buildOffsetLoopTopology(loop_set, boundary_epsilon);
+
+  auto *result = new cavc_offset_loop_topology();
+  result->nodes.reserve(cpp_topology.size());
+  for (auto const &node : cpp_topology) {
+    result->nodes.push_back(to_api_topology_node(node));
+  }
+
+  return result;
+  CAVC_END_TRY_CATCH
+}
+
+void cavc_offset_loop_topology_delete(cavc_offset_loop_topology *topology) {
+  CAVC_BEGIN_TRY_CATCH
+  delete topology;
+  CAVC_END_TRY_CATCH
+}
+
+uint32_t cavc_offset_loop_topology_count(cavc_offset_loop_topology const *topology) {
+  CAVC_ASSERT(topology, "null topology not allowed");
+  CAVC_BEGIN_TRY_CATCH
+  CAVC_ASSERT(topology->nodes.size() <= std::numeric_limits<uint32_t>::max(),
+              "node count exceeds uint32_t");
+  return static_cast<uint32_t>(topology->nodes.size());
+  CAVC_END_TRY_CATCH
+}
+
+cavc_offset_loop_topology_node
+cavc_offset_loop_topology_get(cavc_offset_loop_topology const *topology, uint32_t index) {
+  CAVC_ASSERT(topology, "null topology not allowed");
+  CAVC_ASSERT(index < topology->nodes.size(), "index is out of topology node range");
+  CAVC_BEGIN_TRY_CATCH
+  return topology->nodes[index];
+  CAVC_END_TRY_CATCH
+}
+
+cavc_parallel_offset_options cavc_parallel_offset_default_options(void) {
+  CAVC_BEGIN_TRY_CATCH
+  return cavc_parallel_offset_options{0, CAVC_OFFSET_JOIN_ROUND, CAVC_OFFSET_END_CAP_ROUND, 4.0};
+  CAVC_END_TRY_CATCH
+}
+
 void cavc_parallel_offset(cavc_pline const *pline, cavc_real delta, cavc_pline_list **output,
-                          int option_flags) {
+                          cavc_parallel_offset_options options) {
   CAVC_ASSERT(pline, "null pline not allowed");
   CAVC_ASSERT(output, "null output not allowed");
   CAVC_BEGIN_TRY_CATCH
-  bool mayHaveSelfIntersects = (option_flags & 0x1) != 0;
-  auto results = cavc::parallelOffset(pline->data, delta, mayHaveSelfIntersects);
+  auto cpp_options = to_cpp_parallel_offset_options(options);
+  auto results = cavc::parallelOffset(pline->data, delta, cpp_options);
   *output = new cavc_pline_list();
   move_to_list(std::move(results), *output);
   CAVC_END_TRY_CATCH
@@ -253,6 +516,25 @@ int cavc_get_winding_number(cavc_pline const *pline, cavc_point point) {
   CAVC_END_TRY_CATCH
 }
 
+cavc_point_containment cavc_get_point_containment(cavc_pline const *pline, cavc_point point,
+                                                  cavc_real boundary_epsilon) {
+  CAVC_ASSERT(pline, "null pline not allowed");
+  CAVC_BEGIN_TRY_CATCH
+  auto containment = cavc::getPointContainment(
+      pline->data, cavc::Vector2<cavc_real>(point.x, point.y), boundary_epsilon);
+  switch (containment) {
+  case cavc::PointContainment::Outside:
+    return CAVC_POINT_OUTSIDE;
+  case cavc::PointContainment::Inside:
+    return CAVC_POINT_INSIDE;
+  case cavc::PointContainment::OnBoundary:
+    return CAVC_POINT_ON_BOUNDARY;
+  }
+  CAVC_ASSERT(false, "Unhandled point containment enum");
+  return CAVC_POINT_OUTSIDE;
+  CAVC_END_TRY_CATCH
+}
+
 void cavc_get_extents(cavc_pline const *pline, cavc_real *min_x, cavc_real *min_y, cavc_real *max_x,
                       cavc_real *max_y) {
   CAVC_ASSERT(pline, "null pline not allowed");
@@ -276,5 +558,25 @@ void cavc_get_closest_point(cavc_pline const *pline, cavc_point input_point,
   *closest_start_index = static_cast<uint32_t>(closestPoint.index());
   *closest_point = cavc_point{closestPoint.point().x(), closestPoint.point().y()};
   *distance = closestPoint.distance();
+  CAVC_END_TRY_CATCH
+}
+
+void cavc_get_tolerances(cavc_tolerances *tolerances_out) {
+  CAVC_ASSERT(tolerances_out, "null tolerances_out not allowed");
+  CAVC_BEGIN_TRY_CATCH
+  *tolerances_out = to_api_tolerances(cavc::utils::getEpsilonConfig<cavc_real>());
+  CAVC_END_TRY_CATCH
+}
+
+void cavc_set_tolerances(cavc_tolerances const *tolerances) {
+  CAVC_ASSERT(tolerances, "null tolerances not allowed");
+  CAVC_BEGIN_TRY_CATCH
+  cavc::utils::setEpsilonConfig<cavc_real>(to_cpp_tolerances(*tolerances));
+  CAVC_END_TRY_CATCH
+}
+
+void cavc_reset_tolerances(void) {
+  CAVC_BEGIN_TRY_CATCH
+  cavc::utils::resetEpsilonConfig<cavc_real>();
   CAVC_END_TRY_CATCH
 }

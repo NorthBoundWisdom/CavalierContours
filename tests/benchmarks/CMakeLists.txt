@@ -29,6 +29,7 @@ macro(add_benchmark name)
 endmacro()
 
 add_benchmark(offsetbenchmarks)
+add_benchmark(offsetislandsbenchmarks)
 add_benchmark(spatialindexbenchmarks)
 add_benchmark(extentsbenchmarks)
 add_benchmark(areabenchmarks)

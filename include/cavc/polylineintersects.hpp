@@ -404,7 +404,24 @@ void findIntersects(Polyline<Real> const &pline1, Polyline<Real> const &pline2,
       PlineVertex<Real> const &p1v2 = pline1[j1];
 
       auto intrAtStartPt = [&](Vector2<Real> const &intr) {
-        return fuzzyEqual(p1v1.pos(), intr) || fuzzyEqual(p2v1.pos(), intr);
+        // We normally drop intersects exactly at a segment's start point to avoid duplicates
+        // reported by adjacent segments. However, for open polylines, the very first segment
+        // (start index 0) has no previous segment, so an intersect at pline2's starting
+        // vertex must be kept. Same logic applies to pline1's first segment.
+        bool isPline1FirstOpenSeg = (!pline1.isClosed()) && (i1 == 0);
+        bool isPline2FirstOpenSeg = (!pline2.isClosed()) && (i2 == 0);
+
+        bool atPline1Start = fuzzyEqual(p1v1.pos(), intr);
+        bool atPline2Start = fuzzyEqual(p2v1.pos(), intr);
+
+        if (atPline1Start && isPline1FirstOpenSeg) {
+          return false;
+        }
+        if (atPline2Start && isPline2FirstOpenSeg) {
+          return false;
+        }
+
+        return atPline1Start || atPline2Start;
       };
 
       auto intrResult = intrPlineSegs(p1v1, p1v2, p2v1, p2v2);

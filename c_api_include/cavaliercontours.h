@@ -43,6 +43,10 @@ typedef struct cavc_pline cavc_pline;
 
 typedef struct cavc_pline_list cavc_pline_list;
 
+typedef struct cavc_spatial_index cavc_spatial_index;
+
+typedef struct cavc_offset_loop_topology cavc_offset_loop_topology;
+
 typedef struct cavc_vertex {
   cavc_real x;
   cavc_real y;
@@ -53,6 +57,57 @@ typedef struct cavc_point {
   cavc_real x;
   cavc_real y;
 } cavc_point;
+
+typedef struct cavc_tolerances {
+  cavc_real real_threshold;
+  cavc_real real_precision;
+  cavc_real slice_join_threshold;
+  cavc_real offset_threshold;
+} cavc_tolerances;
+
+typedef enum cavc_point_containment {
+  CAVC_POINT_OUTSIDE = 0,
+  CAVC_POINT_INSIDE = 1,
+  CAVC_POINT_ON_BOUNDARY = 2
+} cavc_point_containment;
+
+typedef enum cavc_closed_winding {
+  CAVC_WINDING_KEEP = 0,
+  CAVC_WINDING_COUNTER_CLOCKWISE = 1,
+  CAVC_WINDING_CLOCKWISE = 2
+} cavc_closed_winding;
+
+typedef enum cavc_offset_join_type {
+  CAVC_OFFSET_JOIN_ROUND = 0,
+  CAVC_OFFSET_JOIN_MITER = 1,
+  CAVC_OFFSET_JOIN_BEVEL = 2
+} cavc_offset_join_type;
+
+typedef enum cavc_offset_end_cap_type {
+  CAVC_OFFSET_END_CAP_ROUND = 0,
+  CAVC_OFFSET_END_CAP_SQUARE = 1,
+  CAVC_OFFSET_END_CAP_BUTT = 2
+} cavc_offset_end_cap_type;
+
+typedef enum cavc_offset_loop_role {
+  CAVC_OFFSET_LOOP_ROLE_OUTER = 0,
+  CAVC_OFFSET_LOOP_ROLE_HOLE = 1
+} cavc_offset_loop_role;
+
+#define CAVC_OFFSET_LOOP_NO_PARENT UINT32_MAX
+
+typedef struct cavc_offset_loop_topology_node {
+  cavc_offset_loop_role role;
+  uint32_t source_index;
+  uint32_t parent_index;
+} cavc_offset_loop_topology_node;
+
+typedef struct cavc_parallel_offset_options {
+  int may_have_self_intersects;
+  cavc_offset_join_type join_type;
+  cavc_offset_end_cap_type end_cap_type;
+  cavc_real miter_limit;
+} cavc_parallel_offset_options;
 
 // Functions for working with cavc_pline
 
@@ -104,6 +159,22 @@ CAVC_API void cavc_pline_clear(cavc_pline *pline);
 // it will be closed.
 CAVC_API void cavc_pline_set_is_closed(cavc_pline *pline, int is_closed);
 
+// Invert the direction of the polyline (preserving geometric shape).
+CAVC_API void cavc_pline_invert_direction(cavc_pline *pline);
+
+// Create a new polyline with repeated positions removed from the input.
+CAVC_API void cavc_pline_prune_singularities(cavc_pline const *pline, cavc_real epsilon,
+                                             cavc_pline **output);
+
+// Create a new polyline with all arc segments approximated by line segments.
+CAVC_API void cavc_pline_convert_arcs_to_lines(cavc_pline const *pline, cavc_real error,
+                                               cavc_pline **output);
+
+// Create a normalized polyline by pruning singularities and optionally normalizing winding.
+// Winding normalization only applies to closed polylines.
+CAVC_API void cavc_pline_normalize(cavc_pline const *pline, cavc_real epsilon,
+                                   cavc_closed_winding closed_winding, cavc_pline **output);
+
 // Functions for working with cavc_pline_list
 
 // Delete/free a cavc_pline_list, this will also delete all elements in the list.
@@ -121,15 +192,73 @@ CAVC_API cavc_pline *cavc_pline_list_get(cavc_pline_list const *pline_list, uint
 // released cavc_pline!
 CAVC_API cavc_pline *cavc_pline_list_release(cavc_pline_list *pline_list, uint32_t index);
 
+// Functions for working with cavc_spatial_index
+
+// Build an approximate segment spatial index from the input polyline. Polyline must have at least
+// 2 vertexes.
+CAVC_API cavc_spatial_index *cavc_spatial_index_create(cavc_pline const *pline);
+
+// Delete/free a cavc_spatial_index.
+CAVC_API void cavc_spatial_index_delete(cavc_spatial_index *spatial_index);
+
+// Returns the number of indexed segments in cavc_spatial_index.
+CAVC_API uint32_t cavc_spatial_index_item_count(cavc_spatial_index const *spatial_index);
+
+// Query the spatial index and return how many segment indexes overlap the given bounding box.
+CAVC_API uint32_t cavc_spatial_index_query_count(cavc_spatial_index const *spatial_index,
+                                                 cavc_real min_x, cavc_real min_y, cavc_real max_x,
+                                                 cavc_real max_y);
+
+// Query the spatial index and write overlapping segment indexes to results_out.
+// results_out must have enough storage for cavc_spatial_index_query_count(...) values.
+CAVC_API void cavc_spatial_index_query(cavc_spatial_index const *spatial_index, cavc_real min_x,
+                                       cavc_real min_y, cavc_real max_x, cavc_real max_y,
+                                       uint32_t *results_out);
+
+// Build stable topology ordering and parent-child mapping for offset loops.
+// The input loops are split by role (ccw=outer, cw=hole).
+// - output order is stable geometry order (area-desc + bbox key)
+// - source_index is within the corresponding input role array
+// - parent_index is index in the returned topology order, or CAVC_OFFSET_LOOP_NO_PARENT
+// All input loops must be closed and contain at least 2 vertices.
+// boundary_epsilon must be >= 0.
+CAVC_API cavc_offset_loop_topology *
+cavc_offset_loop_topology_build(cavc_pline const *const *ccw_loops, uint32_t ccw_loop_count,
+                                cavc_pline const *const *cw_loops, uint32_t cw_loop_count,
+                                cavc_real boundary_epsilon);
+
+// Delete/free a cavc_offset_loop_topology.
+CAVC_API void cavc_offset_loop_topology_delete(cavc_offset_loop_topology *topology);
+
+// Get total node count from cavc_offset_loop_topology.
+CAVC_API uint32_t cavc_offset_loop_topology_count(cavc_offset_loop_topology const *topology);
+
+// Get a topology node at index.
+CAVC_API cavc_offset_loop_topology_node
+cavc_offset_loop_topology_get(cavc_offset_loop_topology const *topology, uint32_t index);
+
 // Algorithm functions
 
-// Generates the parallel offset of a polyline. delta is the offset delta, output is filled with the
-// result, option_flags are bit flags that allow for indicating information about the polyline or
-// forcing certain behaviors in the offset generation, more flags may be added in future versions.
-// If no flags are set then the polyline is assumed to have no self intersects.
-// 0x1 = Indicates the polyline may have self intersects.
+// Returns default parallel offset options:
+// - may_have_self_intersects = 0
+// - join_type = CAVC_OFFSET_JOIN_ROUND
+// - end_cap_type = CAVC_OFFSET_END_CAP_ROUND
+// - miter_limit = 4.0
+CAVC_API cavc_parallel_offset_options cavc_parallel_offset_default_options(void);
+
+// Generates the parallel offset of a polyline. delta is the offset delta, output is filled with
+// the result.
+// Join support:
+// - round: lines and arcs
+// - miter/bevel: line-line joins and arc-involved joins
+//   (arc-involved joins use endpoint tangents; collapsed-arc joins degrade to bevel)
+// - miter_limit applies when join_type is miter (must be >= 1)
+// End cap support:
+// - round/butt: supported
+//   (butt uses endpoint-normal line clipping, round uses endpoint circles)
+// - square: open polylines with line/arc start/end segments
 CAVC_API void cavc_parallel_offset(cavc_pline const *pline, cavc_real delta,
-                                   cavc_pline_list **output, int option_flags);
+                                   cavc_pline_list **output, cavc_parallel_offset_options options);
 
 // Combines two non-self intersecting closed polylines, pline_a and pline_b.
 // For union combine_mode = 0
@@ -159,6 +288,12 @@ CAVC_API cavc_real cavc_get_area(cavc_pline const *pline);
 // https://en.wikipedia.org/wiki/Winding_number
 CAVC_API int cavc_get_winding_number(cavc_pline const *pline, cavc_point point);
 
+// Classify a point against a polyline as Outside/Inside/OnBoundary.
+// For open polylines, only Outside or OnBoundary are returned.
+CAVC_API cavc_point_containment cavc_get_point_containment(cavc_pline const *pline,
+                                                           cavc_point point,
+                                                           cavc_real boundary_epsilon);
+
 // Compute the axis aligned extents of the pline, results are written to min_x, min_y, max_x, and
 // max_y output parameters. If pline is empty then min_x and min_y are filled with positive infinity
 // and max_x and max_y are filled with negative infinity.
@@ -172,6 +307,15 @@ CAVC_API void cavc_get_extents(cavc_pline const *pline, cavc_real *min_x, cavc_r
 CAVC_API void cavc_get_closest_point(cavc_pline const *pline, cavc_point input_point,
                                      uint32_t *closest_start_index, cavc_point *closest_point,
                                      cavc_real *distance);
+
+// Get the current geometry tolerances used by algorithms.
+CAVC_API void cavc_get_tolerances(cavc_tolerances *tolerances_out);
+
+// Override geometry tolerances used by algorithms.
+CAVC_API void cavc_set_tolerances(cavc_tolerances const *tolerances);
+
+// Reset geometry tolerances to default values.
+CAVC_API void cavc_reset_tolerances(void);
 
 #ifdef __cplusplus
 }

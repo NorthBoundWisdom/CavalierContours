@@ -3,14 +3,13 @@
 #include <vector>
 
 #include "c_api_include/cavaliercontours.h"
-#include "polylinefactory.hpp"
-#include "testhelpers.hpp"
+#include "c_api_test_helpers.hpp"
 
 namespace t = testing;
 struct cavc_plineFunctionsTestCase {
   cavc_plineFunctionsTestCase(std::string p_name, std::vector<cavc_vertex> p_vertexes,
                               bool isClosed)
-      : name(std::move(p_name)), pline(PolylineFactory::plineFromVertexes(p_vertexes, isClosed)),
+      : name(std::move(p_name)), pline(plineFromVertexes(p_vertexes, isClosed)),
         plineVertexes(std::move(p_vertexes)) {};
 
   // simple name for the test case
@@ -27,7 +26,7 @@ struct cavc_plineFunctionsTestCase {
 
   // expected path length
   cavc_real pathLength = std::numeric_limits<cavc_real>::quiet_NaN();
-  bool skipPathLengthTest() const { return std::isnan(signedArea); }
+  bool skipPathLengthTest() const { return std::isnan(pathLength); }
 
   // expected extents
   cavc_real minX = std::numeric_limits<double>::quiet_NaN();
@@ -86,8 +85,23 @@ struct cavc_plineFunctionsTestCase {
 
   bool isClosed() const { return cavc_pline_is_closed(pline); }
 };
+
+struct CombineWithSelfTestCase {
+  CombineWithSelfTestCase(std::string p_name, std::vector<cavc_vertex> p_vertexes, bool is_closed)
+      : name(std::move(p_name)), pline(plineFromVertexes(p_vertexes, is_closed)),
+        plineVertexes(std::move(p_vertexes)) {}
+
+  std::string name;
+  cavc_pline *pline = nullptr;
+  std::vector<cavc_vertex> plineVertexes;
+};
 namespace {
 [[maybe_unused]] std::ostream &operator<<(std::ostream &os, cavc_plineFunctionsTestCase const &c) {
+  os << c.name;
+  return os;
+}
+
+[[maybe_unused]] std::ostream &operator<<(std::ostream &os, CombineWithSelfTestCase const &c) {
   os << c.name;
   return os;
 }
@@ -536,6 +550,18 @@ std::vector<cavc_plineFunctionsTestCase> createHalfCircleCases() {
 
   return result;
 }
+
+std::vector<CombineWithSelfTestCase>
+createCombineWithSelfCases(std::vector<cavc_plineFunctionsTestCase> const &cases) {
+  std::vector<CombineWithSelfTestCase> result;
+  for (auto const &test_case : cases) {
+    if (!test_case.isClosed()) {
+      continue;
+    }
+    result.emplace_back(test_case.name, test_case.plineVertexes, true);
+  }
+  return result;
+}
 } // namespace
 
 class cavc_plineFunctionTests : public t::TestWithParam<cavc_plineFunctionsTestCase> {
@@ -562,6 +588,19 @@ INSTANTIATE_TEST_SUITE_P(cavc_pline_circles, cavc_plineFunctionTests,
 
 INSTANTIATE_TEST_SUITE_P(cavc_pline_half_circles, cavc_plineFunctionTests,
                          t::ValuesIn(cavc_plineFunctionTests::halfCircleCases));
+
+static std::vector<CombineWithSelfTestCase> combineWithSelfCircleCases =
+    createCombineWithSelfCases(cavc_plineFunctionTests::circleCases);
+static std::vector<CombineWithSelfTestCase> combineWithSelfHalfCircleCases =
+    createCombineWithSelfCases(cavc_plineFunctionTests::halfCircleCases);
+
+class cavc_combineWithSelfTests : public t::TestWithParam<CombineWithSelfTestCase> {};
+
+INSTANTIATE_TEST_SUITE_P(cavc_combine_with_self_circles, cavc_combineWithSelfTests,
+                         t::ValuesIn(combineWithSelfCircleCases));
+
+INSTANTIATE_TEST_SUITE_P(cavc_combine_with_self_half_circles, cavc_combineWithSelfTests,
+                         t::ValuesIn(combineWithSelfHalfCircleCases));
 
 TEST_P(cavc_plineFunctionTests, cavc_get_path_length) {
   cavc_plineFunctionsTestCase const &testCase = GetParam();
@@ -653,7 +692,8 @@ TEST_P(cavc_plineFunctionTests, cavc_parallel_offset) {
   if (!testCase.skipOffsetTest()) {
     std::vector<cavc_pline_list *> results(testCase.offsetTestDeltas.size());
     for (std::size_t i = 0; i < testCase.offsetTestDeltas.size(); ++i) {
-      cavc_parallel_offset(testCase.pline, testCase.offsetTestDeltas[i], &results[i], 0);
+      cavc_parallel_offset(testCase.pline, testCase.offsetTestDeltas[i], &results[i],
+                           defaultParallelOffsetOptions());
     }
 
     // test there is only one resulting offset pline
@@ -686,7 +726,8 @@ TEST_P(cavc_plineFunctionTests, cavc_parallel_offset) {
   if (!testCase.skipCollapsedOffsetTest()) {
     std::vector<cavc_pline_list *> results(testCase.collapsedOffsetDeltas.size());
     for (std::size_t i = 0; i < testCase.collapsedOffsetDeltas.size(); ++i) {
-      cavc_parallel_offset(testCase.pline, testCase.collapsedOffsetDeltas[i], &results[i], 0);
+      cavc_parallel_offset(testCase.pline, testCase.collapsedOffsetDeltas[i], &results[i],
+                           defaultParallelOffsetOptions());
     }
     ASSERT_THAT(results, t::Each(t::ResultOf(cavc_pline_list_count, t::Eq(0))));
     for (auto result : results) {
@@ -695,11 +736,8 @@ TEST_P(cavc_plineFunctionTests, cavc_parallel_offset) {
   }
 }
 
-TEST_P(cavc_plineFunctionTests, combine_with_self_invariants) {
-  cavc_plineFunctionsTestCase const &testCase = GetParam();
-  if (!testCase.isClosed()) {
-    GTEST_SKIP();
-  }
+TEST_P(cavc_combineWithSelfTests, combine_with_self_invariants) {
+  CombineWithSelfTestCase const &testCase = GetParam();
   cavc_pline_list *remaining = nullptr;
   cavc_pline_list *subtracted = nullptr;
 

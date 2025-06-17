@@ -3,6 +3,8 @@
 #include "polyline.hpp"
 #include "polylinecombine.hpp"
 #include "polylineoffset.hpp"
+#include <algorithm>
+#include <limits>
 #include <unordered_map>
 #include <vector>
 
@@ -17,6 +19,162 @@ template <typename Real> struct OffsetLoopSet {
   std::vector<OffsetLoop<Real>> ccwLoops;
   std::vector<OffsetLoop<Real>> cwLoops;
 };
+
+enum class OffsetLoopRole {
+  Outer = 0,
+  Hole = 1,
+};
+
+constexpr std::size_t kNoParentOffsetLoop = std::numeric_limits<std::size_t>::max();
+
+template <typename Real> struct OffsetLoopTopologyNode {
+  OffsetLoopRole role = OffsetLoopRole::Outer;
+  std::size_t sourceIndex = 0;
+  std::size_t parentIndex = kNoParentOffsetLoop;
+};
+
+template <typename Real> void sortOffsetLoopsStable(std::vector<OffsetLoop<Real>> &loops) {
+  auto absArea = [](OffsetLoop<Real> const &loop) { return std::abs(getArea(loop.polyline)); };
+
+  std::stable_sort(loops.begin(), loops.end(),
+                   [&](OffsetLoop<Real> const &lhs, OffsetLoop<Real> const &rhs) {
+                     Real lhsAbsArea = absArea(lhs);
+                     Real rhsAbsArea = absArea(rhs);
+                     if (lhsAbsArea != rhsAbsArea) {
+                       return lhsAbsArea > rhsAbsArea;
+                     }
+
+                     if (lhs.spatialIndex.minX() != rhs.spatialIndex.minX()) {
+                       return lhs.spatialIndex.minX() < rhs.spatialIndex.minX();
+                     }
+                     if (lhs.spatialIndex.minY() != rhs.spatialIndex.minY()) {
+                       return lhs.spatialIndex.minY() < rhs.spatialIndex.minY();
+                     }
+                     if (lhs.spatialIndex.maxX() != rhs.spatialIndex.maxX()) {
+                       return lhs.spatialIndex.maxX() < rhs.spatialIndex.maxX();
+                     }
+                     if (lhs.spatialIndex.maxY() != rhs.spatialIndex.maxY()) {
+                       return lhs.spatialIndex.maxY() < rhs.spatialIndex.maxY();
+                     }
+
+                     return lhs.parentLoopIndex < rhs.parentLoopIndex;
+                   });
+}
+
+template <typename Real> void sortOffsetLoopSetStable(OffsetLoopSet<Real> &loopSet) {
+  sortOffsetLoopsStable(loopSet.ccwLoops);
+  sortOffsetLoopsStable(loopSet.cwLoops);
+}
+
+template <typename Real>
+std::vector<OffsetLoopTopologyNode<Real>>
+buildOffsetLoopTopology(OffsetLoopSet<Real> const &loopSet,
+                        Real boundaryEpsilon = utils::realPrecision<Real>()) {
+  CAVC_ASSERT(boundaryEpsilon >= Real(0), "boundaryEpsilon must be >= 0");
+
+  struct FlattenedLoopRef {
+    OffsetLoopRole role;
+    std::size_t sourceIndex;
+    OffsetLoop<Real> const *loop;
+    Real absArea;
+  };
+
+  std::vector<FlattenedLoopRef> flattened;
+  flattened.reserve(loopSet.ccwLoops.size() + loopSet.cwLoops.size());
+  for (std::size_t i = 0; i < loopSet.ccwLoops.size(); ++i) {
+    flattened.push_back({OffsetLoopRole::Outer, i, &loopSet.ccwLoops[i],
+                         std::abs(getArea(loopSet.ccwLoops[i].polyline))});
+  }
+
+  for (std::size_t i = 0; i < loopSet.cwLoops.size(); ++i) {
+    flattened.push_back({OffsetLoopRole::Hole, i, &loopSet.cwLoops[i],
+                         std::abs(getArea(loopSet.cwLoops[i].polyline))});
+  }
+
+  std::stable_sort(flattened.begin(), flattened.end(),
+                   [](FlattenedLoopRef const &lhs, FlattenedLoopRef const &rhs) {
+                     if (lhs.absArea != rhs.absArea) {
+                       return lhs.absArea > rhs.absArea;
+                     }
+
+                     if (lhs.loop->spatialIndex.minX() != rhs.loop->spatialIndex.minX()) {
+                       return lhs.loop->spatialIndex.minX() < rhs.loop->spatialIndex.minX();
+                     }
+                     if (lhs.loop->spatialIndex.minY() != rhs.loop->spatialIndex.minY()) {
+                       return lhs.loop->spatialIndex.minY() < rhs.loop->spatialIndex.minY();
+                     }
+                     if (lhs.loop->spatialIndex.maxX() != rhs.loop->spatialIndex.maxX()) {
+                       return lhs.loop->spatialIndex.maxX() < rhs.loop->spatialIndex.maxX();
+                     }
+                     if (lhs.loop->spatialIndex.maxY() != rhs.loop->spatialIndex.maxY()) {
+                       return lhs.loop->spatialIndex.maxY() < rhs.loop->spatialIndex.maxY();
+                     }
+
+                     if (lhs.role != rhs.role) {
+                       return lhs.role == OffsetLoopRole::Outer;
+                     }
+
+                     return lhs.sourceIndex < rhs.sourceIndex;
+                   });
+
+  std::vector<OffsetLoopTopologyNode<Real>> result(flattened.size());
+  for (std::size_t i = 0; i < flattened.size(); ++i) {
+    result[i].role = flattened[i].role;
+    result[i].sourceIndex = flattened[i].sourceIndex;
+  }
+
+  auto pointInsideExpandedLoopBounds = [&](FlattenedLoopRef const &loop_ref,
+                                           Vector2<Real> const &point) {
+    Real const min_x = loop_ref.loop->spatialIndex.minX() - boundaryEpsilon;
+    Real const min_y = loop_ref.loop->spatialIndex.minY() - boundaryEpsilon;
+    Real const max_x = loop_ref.loop->spatialIndex.maxX() + boundaryEpsilon;
+    Real const max_y = loop_ref.loop->spatialIndex.maxY() + boundaryEpsilon;
+    return point.x() >= min_x && point.x() <= max_x && point.y() >= min_y && point.y() <= max_y;
+  };
+
+  for (std::size_t i = 0; i < flattened.size(); ++i) {
+    auto const &child = flattened[i];
+    if (child.loop->polyline.size() == 0) {
+      continue;
+    }
+
+    Vector2<Real> samplePoint = child.loop->polyline[0].pos();
+    std::size_t parentIndex = kNoParentOffsetLoop;
+    Real parentAbsArea = std::numeric_limits<Real>::max();
+
+    for (std::size_t j = 0; j < flattened.size(); ++j) {
+      if (i == j) {
+        continue;
+      }
+
+      auto const &candidate = flattened[j];
+      if (candidate.role == child.role) {
+        continue;
+      }
+      if (candidate.absArea <= child.absArea) {
+        continue;
+      }
+      if (!pointInsideExpandedLoopBounds(candidate, samplePoint)) {
+        continue;
+      }
+
+      PointContainment containment =
+          getPointContainment(candidate.loop->polyline, samplePoint, boundaryEpsilon);
+      if (containment == PointContainment::Outside) {
+        continue;
+      }
+
+      if (candidate.absArea < parentAbsArea) {
+        parentIndex = j;
+        parentAbsArea = candidate.absArea;
+      }
+    }
+
+    result[i].parentIndex = parentIndex;
+  }
+
+  return result;
+}
 
 template <typename Real> class ParallelOffsetIslands {
 public:
@@ -103,34 +261,63 @@ private:
 template <typename Real>
 void ParallelOffsetIslands<Real>::createOffsetLoops(const OffsetLoopSet<Real> &input,
                                                     Real absDelta) {
+  std::size_t const expected_loop_count = input.ccwLoops.size() + input.cwLoops.size();
   // create counter clockwise offset loops
   m_ccwOffsetLoops.clear();
+  m_ccwOffsetLoops.reserve(expected_loop_count);
+  m_cwOffsetLoops.clear();
+  m_cwOffsetLoops.reserve(expected_loop_count);
+
+  auto appendOffsetsWithBatchIndex = [&](std::vector<Polyline<Real>> &offsets,
+                                         std::size_t parent_index,
+                                         std::vector<OffsetLoop<Real>> &target) {
+    if (offsets.size() == 0) {
+      return;
+    }
+
+    std::vector<StaticSpatialIndex<Real>> indexes = createApproxSpatialIndices(offsets);
+    CAVC_ASSERT(indexes.size() == offsets.size(), "batch index size mismatch");
+
+    target.reserve(target.size() + offsets.size());
+    for (std::size_t i = 0; i < offsets.size(); ++i) {
+      target.push_back({parent_index, std::move(offsets[i]), std::move(indexes[i])});
+    }
+  };
+
   std::size_t parentIndex = 0;
   for (auto const &loop : input.ccwLoops) {
     auto offsets = parallelOffset(loop.polyline, absDelta);
+    std::vector<Polyline<Real>> ccwOffsets;
+    ccwOffsets.reserve(offsets.size());
     for (auto &offset : offsets) {
       // must check if orientation inverted (due to collapse of very narrow or small input)
       if (getArea(offset) < Real(0)) {
         continue;
       }
-      auto index = createApproxSpatialIndex(offset);
-      m_ccwOffsetLoops.push_back({parentIndex, std::move(offset), std::move(index)});
+      ccwOffsets.push_back(std::move(offset));
     }
+
+    appendOffsetsWithBatchIndex(ccwOffsets, parentIndex, m_ccwOffsetLoops);
     parentIndex += 1;
   }
 
   // create clockwise offset loops (note counter clockwise loops may result from outward offset)
-  m_cwOffsetLoops.clear();
   for (auto const &loop : input.cwLoops) {
     auto offsets = parallelOffset(loop.polyline, absDelta);
+    std::vector<Polyline<Real>> cwOffsets;
+    std::vector<Polyline<Real>> ccwOffsets;
+    cwOffsets.reserve(offsets.size());
+    ccwOffsets.reserve(offsets.size());
     for (auto &offset : offsets) {
-      auto index = createApproxSpatialIndex(offset);
       if (getArea(offset) < Real(0)) {
-        m_cwOffsetLoops.push_back({parentIndex, std::move(offset), std::move(index)});
+        cwOffsets.push_back(std::move(offset));
       } else {
-        m_ccwOffsetLoops.push_back({parentIndex, std::move(offset), std::move(index)});
+        ccwOffsets.push_back(std::move(offset));
       }
     }
+
+    appendOffsetsWithBatchIndex(cwOffsets, parentIndex, m_cwOffsetLoops);
+    appendOffsetsWithBatchIndex(ccwOffsets, parentIndex, m_ccwOffsetLoops);
     parentIndex += 1;
   }
 }
@@ -151,12 +338,17 @@ template <typename Real> void ParallelOffsetIslands<Real>::createOffsetLoopsInde
 }
 
 template <typename Real> void ParallelOffsetIslands<Real>::createSlicePoints() {
+  std::size_t const totalOffsetCount = totalOffsetLoopsCount();
+
   m_visitedLoopPairs.clear();
+  m_visitedLoopPairs.reserve(totalOffsetCount * 2);
   m_slicePointSets.clear();
+  m_slicePointSets.reserve(totalOffsetCount);
   m_slicePointsLookup.clear();
+  m_queryResults.clear();
+  m_queryResults.reserve(totalOffsetCount);
 
   // find all intersects between all offsets
-  std::size_t totalOffsetCount = totalOffsetLoopsCount();
   m_slicePointsLookup.resize(totalOffsetCount);
   PlineIntersectsResult<Real> intrsResults;
   for (std::size_t i = 0; i < totalOffsetCount; ++i) {
@@ -371,8 +563,10 @@ OffsetLoopSet<Real> ParallelOffsetIslands<Real>::compute(const OffsetLoopSet<Rea
 
   std::vector<DissectedSlice> slices;
   std::size_t totalOffsetsCount = totalOffsetLoopsCount();
+  slices.reserve(totalOffsetsCount * 2);
 
   std::vector<Polyline<Real>> resultSlices;
+  resultSlices.reserve(totalOffsetsCount * 2);
 
   for (std::size_t i = 0; i < totalOffsetsCount; ++i) {
     if (m_slicePointsLookup[i].size() == 0) {
@@ -398,20 +592,45 @@ OffsetLoopSet<Real> ParallelOffsetIslands<Real>::compute(const OffsetLoopSet<Rea
 
   std::vector<Polyline<Real>> stitched =
       internal::stitchOrderedSlicesIntoClosedPolylines(resultSlices);
+  result.ccwLoops.reserve(result.ccwLoops.size() + stitched.size());
+  result.cwLoops.reserve(result.cwLoops.size() + stitched.size());
+
+  std::vector<Polyline<Real>> stitchedCcwLoops;
+  std::vector<Polyline<Real>> stitchedCwLoops;
+  stitchedCcwLoops.reserve(stitched.size());
+  stitchedCwLoops.reserve(stitched.size());
 
   for (auto &r : stitched) {
     Real area = getArea(r);
     if (std::abs(area) < 1e-4) {
       continue;
     }
-    auto spatialIndex = createApproxSpatialIndex(r);
     if (area < Real(0)) {
-      result.cwLoops.push_back({0, std::move(r), std::move(spatialIndex)});
+      stitchedCwLoops.push_back(std::move(r));
     } else {
-      result.ccwLoops.push_back({0, std::move(r), std::move(spatialIndex)});
+      stitchedCcwLoops.push_back(std::move(r));
     }
   }
 
+  auto appendStitchedWithBatchIndex = [&](std::vector<Polyline<Real>> &loops,
+                                          std::vector<OffsetLoop<Real>> &target) {
+    if (loops.size() == 0) {
+      return;
+    }
+
+    std::vector<StaticSpatialIndex<Real>> indexes = createApproxSpatialIndices(loops);
+    CAVC_ASSERT(indexes.size() == loops.size(), "batch index size mismatch");
+
+    target.reserve(target.size() + loops.size());
+    for (std::size_t i = 0; i < loops.size(); ++i) {
+      target.push_back({0, std::move(loops[i]), std::move(indexes[i])});
+    }
+  };
+
+  appendStitchedWithBatchIndex(stitchedCcwLoops, result.ccwLoops);
+  appendStitchedWithBatchIndex(stitchedCwLoops, result.cwLoops);
+
+  sortOffsetLoopSetStable(result);
   return result;
 }
 

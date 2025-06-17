@@ -1,15 +1,13 @@
+#include <cstdint>
 #include <gmock/gmock.h>
 #include <vector>
 
 #include <gtest/gtest.h>
 
+#include "cavc/staticspatialindex.hpp"
 #include "testhelpers.hpp"
 
-#include <cavc/staticspatialindex.hpp>
-
 namespace t = testing;
-
-namespace {
 
 std::vector<double> createTestData() {
   return std::vector<double>{
@@ -59,18 +57,23 @@ struct Box {
   double minY;
   double maxX;
   double maxY;
+
+  std::string toInitList() const {
+    std::stringstream ss;
+    ss << "{" << minX << "," << minY << "," << maxX << "," << maxY << "}";
+    return ss.str();
+  }
 };
 
-[[maybe_unused]] std::ostream &operator<<(std::ostream &os, Box const &box) {
+std::ostream &operator<<(std::ostream &os, Box const &box) {
   os << "{" << box.minX << ", " << box.minY << ", " << box.maxX << ", " << box.maxY << "}";
   return os;
 }
 
-[[maybe_unused]] bool operator==(Box const &left, Box const &right) {
+bool operator==(Box const &left, Box const &right) {
   return fuzzyEqual(left.minX, right.minX) && fuzzyEqual(left.minY, right.minY) &&
          fuzzyEqual(left.maxX, right.maxX) && fuzzyEqual(left.maxY, right.maxY);
 }
-} // namespace
 
 TEST(StaticSpatialIndexTests, index) {
   auto index = createIndex();
@@ -239,8 +242,8 @@ TEST(StaticSpatialIndexTests, visitQuery) {
   auto index = createIndex();
 
   std::vector<std::size_t> queryResults;
-  auto visitor = [&](std::size_t p_index) {
-    queryResults.push_back(p_index);
+  auto visitor = [&](std::size_t index) {
+    queryResults.push_back(index);
     return true;
   };
 
@@ -253,8 +256,8 @@ TEST(StaticSpatialIndexTests, visitQuery_stops_early) {
   auto index = createIndex();
 
   std::vector<std::size_t> queryResults;
-  auto visitor = [&](std::size_t p_index) {
-    queryResults.push_back(p_index);
+  auto visitor = [&](std::size_t index) {
+    queryResults.push_back(index);
     return queryResults.size() != 2;
   };
 
@@ -268,8 +271,8 @@ TEST(StaticSpatialIndexTests, visitItemBoxes) {
   auto index = createIndex();
 
   std::vector<std::size_t> indexes;
-  auto visitor = [&](std::size_t p_index, double, double, double, double) {
-    indexes.push_back(p_index);
+  auto visitor = [&](std::size_t index, double, double, double, double) {
+    indexes.push_back(index);
     return true;
   };
 
@@ -283,6 +286,37 @@ TEST(StaticSpatialIndexTests, visitItemBoxes) {
 
   ASSERT_THAT(indexes, t::WhenSorted(t::ContainerEq(expectedIndexes)));
 }
+
+TEST(StaticSpatialIndexTests, query_with_degenerate_global_extents) {
+  {
+    cavc::StaticSpatialIndex<double, 16> index(17);
+    for (std::size_t i = 0; i < 17; ++i) {
+      double y = static_cast<double>(i);
+      // all boxes have the same x extents (global width is zero)
+      index.add(1.0, y, 1.0, y + 0.1);
+    }
+    index.finish();
+
+    std::vector<std::size_t> queryResults;
+    index.query(0.0, -1.0, 2.0, 18.0, queryResults);
+    ASSERT_EQ(queryResults.size(), 17u);
+  }
+
+  {
+    cavc::StaticSpatialIndex<double, 16> index(17);
+    for (std::size_t i = 0; i < 17; ++i) {
+      double x = static_cast<double>(i);
+      // all boxes have the same y extents (global height is zero)
+      index.add(x, 2.0, x + 0.1, 2.0);
+    }
+    index.finish();
+
+    std::vector<std::size_t> queryResults;
+    index.query(-1.0, 1.0, 18.0, 3.0, queryResults);
+    ASSERT_EQ(queryResults.size(), 17u);
+  }
+}
+
 int main(int argc, char **argv) {
   t::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();

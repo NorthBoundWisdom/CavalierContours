@@ -429,7 +429,8 @@ CombineResult<Real> combinePolylines(Polyline<Real> const &plineA, Polyline<Real
   auto isAInsideB = [&] { return pointInB(plineA[0].pos()); };
   auto isBInsideA = [&] { return pointInA(plineB[0].pos()); };
 
-  auto createUnionAndIntersectStitchSelector = [](std::size_t startOfCoincidentSlicesIdx) {
+  auto createUnionAndIntersectStitchSelector = [](std::size_t startOfCoincidentSlicesIdx)
+      -> std::function<std::size_t(std::size_t, std::vector<std::size_t> const &)> {
     return [=](std::size_t currSliceIndex, std::vector<std::size_t> const &available) {
       // attempt to select noncoincident slice
       auto idx = std::find_if(available.begin(), available.end(),

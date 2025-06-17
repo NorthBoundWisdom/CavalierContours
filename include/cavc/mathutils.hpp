@@ -3,21 +3,63 @@
 
 #include "internal/common.hpp"
 #include <cmath>
+#include <iterator>
 
 namespace cavc {
 namespace utils {
+template <typename Real> constexpr Real defaultRealThreshold() { return Real(1e-8); }
+
+template <typename Real> constexpr Real defaultRealPrecision() { return Real(1e-5); }
+
+template <typename Real> constexpr Real defaultSliceJoinThreshold() { return Real(1e-4); }
+
+template <typename Real> constexpr Real defaultOffsetThreshold() { return Real(1e-4); }
+
+template <typename Real> struct EpsilonConfig {
+  Real realThreshold;
+  Real realPrecision;
+  Real sliceJoinThreshold;
+  Real offsetThreshold;
+};
+
+template <typename Real> constexpr EpsilonConfig<Real> defaultEpsilonConfig() {
+  return {defaultRealThreshold<Real>(), defaultRealPrecision<Real>(),
+          defaultSliceJoinThreshold<Real>(), defaultOffsetThreshold<Real>()};
+}
+
+template <typename Real> EpsilonConfig<Real> &epsilonConfig() {
+  static EpsilonConfig<Real> config = defaultEpsilonConfig<Real>();
+  return config;
+}
+
+template <typename Real> EpsilonConfig<Real> getEpsilonConfig() { return epsilonConfig<Real>(); }
+
+template <typename Real> void setEpsilonConfig(EpsilonConfig<Real> const &config) {
+  CAVC_ASSERT(config.realThreshold > Real(0), "realThreshold must be > 0");
+  CAVC_ASSERT(config.realPrecision > Real(0), "realPrecision must be > 0");
+  CAVC_ASSERT(config.sliceJoinThreshold > Real(0), "sliceJoinThreshold must be > 0");
+  CAVC_ASSERT(config.offsetThreshold > Real(0), "offsetThreshold must be > 0");
+  epsilonConfig<Real>() = config;
+}
+
+template <typename Real> void resetEpsilonConfig() {
+  epsilonConfig<Real>() = defaultEpsilonConfig<Real>();
+}
+
 // absolute threshold to be used for comparing reals generally
-template <typename Real> constexpr Real realThreshold() { return Real(1e-8); }
+template <typename Real> Real realThreshold() { return epsilonConfig<Real>().realThreshold; }
 
 // absolute threshold to be used for reals in common geometric computation (e.g. to check for
 // singularities)
-template <typename Real> constexpr Real realPrecision() { return Real(1e-5); }
+template <typename Real> Real realPrecision() { return epsilonConfig<Real>().realPrecision; }
 
 // absolute threshold to be used for joining slices together at end points
-template <typename Real> constexpr Real sliceJoinThreshold() { return Real(1e-4); }
+template <typename Real> Real sliceJoinThreshold() {
+  return epsilonConfig<Real>().sliceJoinThreshold;
+}
 
 // absolute threshold to be used for pruning invalid slices for offset
-template <typename Real> constexpr Real offsetThreshold() { return Real(1e-4); }
+template <typename Real> Real offsetThreshold() { return epsilonConfig<Real>().offsetThreshold; }
 
 template <typename Real> constexpr Real pi() { return Real(3.14159265358979323846264338327950288); }
 

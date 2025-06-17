@@ -17,14 +17,8 @@ public:
   Polyline() : m_isClosed(false), m_vertexes() {}
 
   using PVertex = PlineVertex<Real>;
-  inline PVertex const &operator[](std::size_t i) const {
-    CAVC_ASSERT(i < m_vertexes.size(), "index out of bounds");
-    return m_vertexes[i];
-  }
-  inline PVertex &operator[](std::size_t i) {
-    CAVC_ASSERT(i < m_vertexes.size(), "index out of bounds");
-    return m_vertexes[i];
-  }
+  inline PVertex const &operator[](std::size_t i) const { return m_vertexes[i]; }
+  inline PVertex &operator[](std::size_t i) { return m_vertexes[i]; }
 
   bool isClosed() const { return m_isClosed; }
   bool &isClosed() { return m_isClosed; }
@@ -34,14 +28,8 @@ public:
 
   std::size_t size() const { return m_vertexes.size(); }
 
-  PVertex const &lastVertex() const {
-    CAVC_ASSERT(!m_vertexes.empty(), "cannot get last vertex of empty polyline");
-    return m_vertexes.back();
-  }
-  PVertex &lastVertex() {
-    CAVC_ASSERT(!m_vertexes.empty(), "cannot get last vertex of empty polyline");
-    return m_vertexes.back();
-  }
+  PVertex const &lastVertex() const { return m_vertexes.back(); }
+  PVertex &lastVertex() { return m_vertexes.back(); }
 
   std::vector<PVertex> &vertexes() { return m_vertexes; }
   std::vector<PVertex> const &vertexes() const { return m_vertexes; }
@@ -286,11 +274,6 @@ template <typename Real>
 Polyline<Real> convertArcsToLines(Polyline<Real> const &pline, Real error) {
   cavc::Polyline<Real> result;
   result.isClosed() = pline.isClosed();
-  // Handle empty polyline
-  if (pline.size() == 0) {
-    return result;
-  }
-
   auto visitor = [&](std::size_t i, std::size_t j) {
     const auto &v1 = pline[i];
     const auto &v2 = pline[j];
@@ -311,7 +294,7 @@ Polyline<Real> convertArcsToLines(Polyline<Real> const &pline, Real error) {
       Real segmentSubAngle = std::abs(Real(2) * std::acos(Real(1) - error / arc.radius));
       std::size_t segmentCount = static_cast<std::size_t>(std::ceil(deltaAngle / segmentSubAngle));
       // update segment subangle for equal length segments
-      segmentSubAngle = deltaAngle / segmentCount;
+      segmentSubAngle = deltaAngle / static_cast<Real>(segmentCount);
 
       if (v1.bulgeIsNeg()) {
         segmentSubAngle = -segmentSubAngle;
@@ -320,7 +303,7 @@ Polyline<Real> convertArcsToLines(Polyline<Real> const &pline, Real error) {
       result.addVertex(v1.x(), v1.y(), 0.0);
       // add the remaining points
       for (std::size_t k = 1; k < segmentCount; ++k) {
-        Real angle = k * segmentSubAngle + startAngle;
+        Real angle = static_cast<Real>(k) * segmentSubAngle + startAngle;
         result.addVertex(arc.radius * std::cos(angle) + arc.center.x(),
                          arc.radius * std::sin(angle) + arc.center.y(), 0);
       }
@@ -390,6 +373,35 @@ template <typename Real> void invertDirection(Polyline<Real> &pline) {
   pline.lastVertex().bulge() = -firstBulge;
 }
 
+enum class ClosedPolylineWinding {
+  Keep = 0,
+  CounterClockwise = 1,
+  Clockwise = 2,
+};
+
+/// Normalize polyline geometry by pruning singularities and optionally normalizing winding.
+/// - Repeating positions are removed using pruneSingularities.
+/// - Winding normalization only applies to closed polylines with at least 2 vertexes.
+template <typename Real>
+Polyline<Real>
+normalizePolyline(Polyline<Real> const &pline, Real epsilon = utils::realPrecision<Real>(),
+                  ClosedPolylineWinding closedWinding = ClosedPolylineWinding::Keep) {
+  Polyline<Real> result = pruneSingularities(pline, epsilon);
+
+  if (!result.isClosed() || result.size() < 2 || closedWinding == ClosedPolylineWinding::Keep) {
+    return result;
+  }
+
+  Real area = getArea(result);
+  if (closedWinding == ClosedPolylineWinding::CounterClockwise && area < Real(0)) {
+    invertDirection(result);
+  } else if (closedWinding == ClosedPolylineWinding::Clockwise && area > Real(0)) {
+    invertDirection(result);
+  }
+
+  return result;
+}
+
 /// Creates an approximate spatial index for all the segments in the polyline given using
 /// createFastApproxBoundingBox.
 template <typename Real>
@@ -412,6 +424,18 @@ StaticSpatialIndex<Real> createApproxSpatialIndex(Polyline<Real> const &pline) {
 
   result.finish();
 
+  return result;
+}
+
+/// Creates approximate spatial indexes for a batch of closed or open polylines.
+template <typename Real>
+std::vector<StaticSpatialIndex<Real>>
+createApproxSpatialIndices(std::vector<Polyline<Real>> const &plines) {
+  std::vector<StaticSpatialIndex<Real>> result;
+  result.reserve(plines.size());
+  for (auto const &pline : plines) {
+    result.push_back(createApproxSpatialIndex(pline));
+  }
   return result;
 }
 
@@ -559,6 +583,35 @@ int getWindingNumber(Polyline<Real> const &pline, Vector2<Real> const &point) {
   pline.visitSegIndices(visitor);
 
   return windingNumber;
+}
+
+enum class PointContainment {
+  Outside = 0,
+  Inside = 1,
+  OnBoundary = 2,
+};
+
+/// Classify point containment against a polyline.
+/// - Open polyline: only OnBoundary or Outside is possible.
+/// - Closed polyline: returns Inside/Outside/OnBoundary.
+template <typename Real>
+PointContainment getPointContainment(Polyline<Real> const &pline, Vector2<Real> const &point,
+                                     Real boundaryEpsilon = utils::realPrecision<Real>()) {
+  CAVC_ASSERT(boundaryEpsilon >= Real(0), "boundaryEpsilon must be >= 0");
+  if (pline.size() < 2) {
+    return PointContainment::Outside;
+  }
+
+  ClosestPoint<Real> closestPoint(pline, point);
+  if (closestPoint.distance() <= boundaryEpsilon) {
+    return PointContainment::OnBoundary;
+  }
+
+  if (!pline.isClosed()) {
+    return PointContainment::Outside;
+  }
+
+  return getWindingNumber(pline, point) == 0 ? PointContainment::Outside : PointContainment::Inside;
 }
 
 namespace internal {
