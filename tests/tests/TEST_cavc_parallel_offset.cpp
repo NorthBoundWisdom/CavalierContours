@@ -4,7 +4,8 @@
 #include <gtest/gtest.h>
 
 #include "c_api_include/cavaliercontours.h"
-#include "c_api_test_helpers.hpp"
+#include "polylinefactory.hpp"
+#include "testhelpers.hpp"
 
 namespace t = testing;
 
@@ -18,7 +19,7 @@ struct ParallelOffsetTestCase {
                          std::vector<cavc_vertex> const &p_plineVertexes, bool isClosed,
                          std::vector<PolylineProperties> p_expectedResult)
       : name(std::move(p_name)), offsetDelta(p_delta),
-        pline(plineFromVertexes(p_plineVertexes, isClosed)),
+        pline(PolylineFactory::plineFromVertexes(p_plineVertexes, isClosed)),
         expectedResult(std::move(p_expectedResult)) {}
 };
 namespace {
@@ -205,7 +206,7 @@ TEST_P(cavc_parallel_offsetTests, parallel_offset_test) {
 TEST_P(cavc_parallel_offsetTests, reversed_parallel_offset_test) {
   ParallelOffsetTestCase const &testCase = GetParam();
   // create the reversed polyline
-  cavc_pline *revPline = createRevseredPline(testCase.pline);
+  cavc_pline *revPline = PolylineFactory::createRevseredPline(testCase.pline);
   // negate delta to offset the same direction
   cavc_real delta = -testCase.offsetDelta;
   // sign of the area is also negated

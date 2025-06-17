@@ -1,12 +1,7 @@
 cmake_minimum_required(VERSION 3.21)
 
-set(gtesthelper
-    ${CMAKE_CURRENT_SOURCE_DIR}/c_api_test_helpers.hpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/testhelpers.hpp
-)
-
 macro(cavc_add_test name)
-    add_executable(${name} ${name}.cpp ${gtesthelper})
+    add_executable(${name} ${name}.cpp)
 
     target_include_directories(${name}
     PRIVATE

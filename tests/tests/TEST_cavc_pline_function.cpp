@@ -3,13 +3,14 @@
 #include <vector>
 
 #include "c_api_include/cavaliercontours.h"
-#include "c_api_test_helpers.hpp"
+#include "polylinefactory.hpp"
+#include "testhelpers.hpp"
 
 namespace t = testing;
 struct cavc_plineFunctionsTestCase {
   cavc_plineFunctionsTestCase(std::string p_name, std::vector<cavc_vertex> p_vertexes,
                               bool isClosed)
-      : name(std::move(p_name)), pline(plineFromVertexes(p_vertexes, isClosed)),
+      : name(std::move(p_name)), pline(PolylineFactory::plineFromVertexes(p_vertexes, isClosed)),
         plineVertexes(std::move(p_vertexes)) {};
 
   // simple name for the test case

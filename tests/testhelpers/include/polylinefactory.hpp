@@ -17,7 +17,14 @@ public:
   // center, if isCW is true then circle goes clockwise else counter clockwise.
   static std::vector<cavc_vertex> createCircle(cavc_real radius, cavc_point center,
                                                cavc_real vertexRotAngle, bool isCW);
+
   static cavc_pline_ptr vertexesToPline(std::vector<cavc_vertex> const &vertexes, bool isClosed);
+
+  static cavc_pline *plineFromVertexes(std::vector<cavc_vertex> const &vertexes, bool isClosed);
+
+  static void reverseDirection(std::vector<cavc_vertex> &vertexes);
+
+  static cavc_pline *createRevseredPline(cavc_pline *pline);
 };
 
 #endif // CAVC_POLYLINEPATHFACTORY_HPP

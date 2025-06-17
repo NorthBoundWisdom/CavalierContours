@@ -4,7 +4,7 @@
 #include <gtest/gtest.h>
 
 #include "c_api_include/cavaliercontours.h"
-#include "c_api_test_helpers.hpp"
+#include "polylinefactory.hpp"
 
 // Use basic gtest rather than gmock to make debug easier
 TEST(basic, basic_extent) {
@@ -14,7 +14,7 @@ TEST(basic, basic_extent) {
   cavc_real maxY;
   // Quad Circle
   std::vector<cavc_vertex> plineAVertexes = {{1.0, 0.00, -0.4142135623730951}, {0.0, -1.0, 0.00}};
-  cavc_pline *plineA = plineFromVertexes(plineAVertexes, true);
+  cavc_pline *plineA = PolylineFactory::plineFromVertexes(plineAVertexes, true);
   cavc_get_extents(plineA, &minX, &minY, &maxX, &maxY);
   EXPECT_NEAR(minX, 0, 1e-15);
   EXPECT_NEAR(minY, -1, 1e-15);
@@ -23,7 +23,7 @@ TEST(basic, basic_extent) {
 
   // Half circle cw
   std::vector<cavc_vertex> plineBVertexes = {{1.0, 0.00, -1.00}, {0.0, 0.00, 0.00}};
-  cavc_pline *plineB1 = plineFromVertexes(plineBVertexes, true);
+  cavc_pline *plineB1 = PolylineFactory::plineFromVertexes(plineBVertexes, true);
   cavc_get_extents(plineB1, &minX, &minY, &maxX, &maxY);
   EXPECT_NEAR(minX, 0, 1e-15);
   EXPECT_NEAR(minY, -0.5, 1e-15);
@@ -32,7 +32,7 @@ TEST(basic, basic_extent) {
 
   // Half circle ccw
   plineBVertexes.front().bulge = 1;
-  cavc_pline *plineB2 = plineFromVertexes(plineBVertexes, true);
+  cavc_pline *plineB2 = PolylineFactory::plineFromVertexes(plineBVertexes, true);
   cavc_get_extents(plineB2, &minX, &minY, &maxX, &maxY);
   EXPECT_NEAR(minX, 0, 1e-15);
   EXPECT_NEAR(minY, 0, 1e-15);
@@ -44,7 +44,7 @@ TEST(basic, basic_extent) {
       {0.0, 0.00, 1.00},
       {0.0, 1.00, 0.00},
   };
-  cavc_pline *plineC1 = plineFromVertexes(plineCVertexes, true);
+  cavc_pline *plineC1 = PolylineFactory::plineFromVertexes(plineCVertexes, true);
   cavc_get_extents(plineC1, &minX, &minY, &maxX, &maxY);
   EXPECT_NEAR(minX, 0, 1e-15);
   EXPECT_NEAR(minY, 0, 1e-15);
@@ -53,7 +53,7 @@ TEST(basic, basic_extent) {
 
   // Half circle cw
   plineCVertexes.front().bulge = -1;
-  cavc_pline *plineC2 = plineFromVertexes(plineCVertexes, true);
+  cavc_pline *plineC2 = PolylineFactory::plineFromVertexes(plineCVertexes, true);
   cavc_get_extents(plineC2, &minX, &minY, &maxX, &maxY);
   EXPECT_NEAR(minX, -0.5, 1e-15);
   EXPECT_NEAR(minY, 0, 1e-15);

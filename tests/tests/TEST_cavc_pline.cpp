@@ -4,7 +4,9 @@
 #include <gtest/gtest.h>
 
 #include "c_api_include/cavaliercontours.h"
-#include "c_api_test_helpers.hpp"
+#include "polylinefactory.hpp"
+#include "testhelpers.hpp"
+
 
 namespace t = testing;
 

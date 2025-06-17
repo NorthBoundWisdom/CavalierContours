@@ -1,4 +1,3 @@
-#include <cstdint>
 #include <gmock/gmock.h>
 #include <vector>
 
@@ -8,6 +7,8 @@
 #include "testhelpers.hpp"
 
 namespace t = testing;
+
+namespace {
 
 std::vector<double> createTestData() {
   return std::vector<double>{
@@ -57,23 +58,18 @@ struct Box {
   double minY;
   double maxX;
   double maxY;
-
-  std::string toInitList() const {
-    std::stringstream ss;
-    ss << "{" << minX << "," << minY << "," << maxX << "," << maxY << "}";
-    return ss.str();
-  }
 };
 
-std::ostream &operator<<(std::ostream &os, Box const &box) {
+[[maybe_unused]] std::ostream &operator<<(std::ostream &os, Box const &box) {
   os << "{" << box.minX << ", " << box.minY << ", " << box.maxX << ", " << box.maxY << "}";
   return os;
 }
 
-bool operator==(Box const &left, Box const &right) {
+[[maybe_unused]] bool operator==(Box const &left, Box const &right) {
   return fuzzyEqual(left.minX, right.minX) && fuzzyEqual(left.minY, right.minY) &&
          fuzzyEqual(left.maxX, right.maxX) && fuzzyEqual(left.maxY, right.maxY);
 }
+} // namespace
 
 TEST(StaticSpatialIndexTests, index) {
   auto index = createIndex();
@@ -242,8 +238,8 @@ TEST(StaticSpatialIndexTests, visitQuery) {
   auto index = createIndex();
 
   std::vector<std::size_t> queryResults;
-  auto visitor = [&](std::size_t index) {
-    queryResults.push_back(index);
+  auto visitor = [&](std::size_t p_index) {
+    queryResults.push_back(p_index);
     return true;
   };
 
@@ -256,8 +252,8 @@ TEST(StaticSpatialIndexTests, visitQuery_stops_early) {
   auto index = createIndex();
 
   std::vector<std::size_t> queryResults;
-  auto visitor = [&](std::size_t index) {
-    queryResults.push_back(index);
+  auto visitor = [&](std::size_t p_index) {
+    queryResults.push_back(p_index);
     return queryResults.size() != 2;
   };
 
@@ -271,8 +267,8 @@ TEST(StaticSpatialIndexTests, visitItemBoxes) {
   auto index = createIndex();
 
   std::vector<std::size_t> indexes;
-  auto visitor = [&](std::size_t index, double, double, double, double) {
-    indexes.push_back(index);
+  auto visitor = [&](std::size_t p_index, double, double, double, double) {
+    indexes.push_back(p_index);
     return true;
   };
 

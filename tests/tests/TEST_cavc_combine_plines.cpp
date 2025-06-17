@@ -4,7 +4,8 @@
 #include <gtest/gtest.h>
 
 #include "c_api_include/cavaliercontours.h"
-#include "c_api_test_helpers.hpp"
+#include "polylinefactory.hpp"
+#include "testhelpers.hpp"
 
 namespace t = testing;
 
@@ -49,8 +50,8 @@ std::vector<CombinePlinesTestCase> createSimpleCases() {
     // combining circle and rectangle
     std::vector<cavc_vertex> plineAVertexes = {{0, 1, 1}, {10, 1, 1}};
     std::vector<cavc_vertex> plineBVertexes = {{3, -10, 0}, {6, -10, 0}, {6, 10, 0}, {3, 10, 0}};
-    cavc_pline *plineA = plineFromVertexes(plineAVertexes, true);
-    cavc_pline *plineB = plineFromVertexes(plineBVertexes, true);
+    cavc_pline *plineA = PolylineFactory::plineFromVertexes(plineAVertexes, true);
+    cavc_pline *plineB = PolylineFactory::plineFromVertexes(plineBVertexes, true);
     std::vector<PolylineProperties> expectedRemaining;
     std::vector<PolylineProperties> expectedSubtracted;
 
@@ -106,8 +107,8 @@ std::vector<CombinePlinesTestCase> createCoincidentCases() {
     std::vector<cavc_vertex> plineBVertexes = {
         {-0.25, 0.235, -0.414214}, {-0.255, 0.24, 0}, {-0.255, 0.29, -0.414214}, {-0.25, 0.295, 0},
         {0.25, 0.295, -0.414214},  {0.255, 0.29, 0},  {0.255, 0.24, -0.414214},  {0.25, 0.235, 0}};
-    cavc_pline *plineA = plineFromVertexes(plineAVertexes, true);
-    cavc_pline *plineB = plineFromVertexes(plineBVertexes, true);
+    cavc_pline *plineA = PolylineFactory::plineFromVertexes(plineAVertexes, true);
+    cavc_pline *plineB = PolylineFactory::plineFromVertexes(plineBVertexes, true);
 
     // Union
     std::vector<PolylineProperties> expectedRemaining;
@@ -156,8 +157,8 @@ std::vector<CombinePlinesTestCase> createCoincidentCases() {
     std::vector<cavc_vertex> plineBVertexes = {
         {-2, 10, 0}, {-2, 20, 0}, {2, 20, 0}, {2, 25, 0},  {4, 25, 0},  {4, 20, 0}, {6, 20, 0},
         {6, 15, 0},  {8, 15, 0},  {8, 20, 0}, {10, 40, 0}, {30, 40, 0}, {30, 20, 0}};
-    cavc_pline *plineA = plineFromVertexes(plineAVertexes, true);
-    cavc_pline *plineB = plineFromVertexes(plineBVertexes, true);
+    cavc_pline *plineA = PolylineFactory::plineFromVertexes(plineAVertexes, true);
+    cavc_pline *plineB = PolylineFactory::plineFromVertexes(plineBVertexes, true);
     // Union
     std::vector<PolylineProperties> expectedRemaining;
     expectedRemaining.emplace_back(16, -865, 150.17204220292, -2, 0, 30, 40);
@@ -253,9 +254,9 @@ TEST(cavc_combine_plinesTests, combine_with_self_invariants) {
                                             {31, 1.75, 0},        {29, 1.75, -0.414214},
                                             {28.5, 1.25, 0},      {27.804688, 1.25, 0.414214}};
   std::vector<cavc_vertex> revPlineVertexes = plineVertexes;
-  reverseDirection(revPlineVertexes);
-  cavc_pline *pline = plineFromVertexes(plineVertexes, true);
-  cavc_pline *revPline = plineFromVertexes(revPlineVertexes, true);
+  PolylineFactory::reverseDirection(revPlineVertexes);
+  cavc_pline *pline = PolylineFactory::plineFromVertexes(plineVertexes, true);
+  cavc_pline *revPline = PolylineFactory::plineFromVertexes(revPlineVertexes, true);
 
   cavc_pline_list *remaining = nullptr;
   cavc_pline_list *subtracted = nullptr;

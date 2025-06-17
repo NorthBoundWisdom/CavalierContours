@@ -343,19 +343,19 @@ IntrPlineSegsResult<Real> intrPlineSegs(PlineVertex<Real> const &v1, PlineVertex
       }
     } else {
       CAVC_ASSERT(intrResult.numIntersects == 2, "shouldn't get here without 2 intersects");
-      auto p1 = pointInSweep(intrResult.t0);
-      auto p2 = pointInSweep(intrResult.t1);
+      auto l_p1 = pointInSweep(intrResult.t0);
+      auto l_p2 = pointInSweep(intrResult.t1);
 
-      if (p1.first && p2.first) {
+      if (l_p1.first && l_p2.first) {
         result.intrType = PlineSegIntrType::TwoIntersects;
-        result.point1 = p1.second;
-        result.point2 = p2.second;
-      } else if (p1.first) {
+        result.point1 = l_p1.second;
+        result.point2 = l_p2.second;
+      } else if (l_p1.first) {
         result.intrType = PlineSegIntrType::OneIntersect;
-        result.point1 = p1.second;
-      } else if (p2.first) {
+        result.point1 = l_p1.second;
+      } else if (l_p2.first) {
         result.intrType = PlineSegIntrType::OneIntersect;
-        result.point1 = p2.second;
+        result.point1 = l_p2.second;
       } else {
         result.intrType = PlineSegIntrType::NoIntersect;
       }
