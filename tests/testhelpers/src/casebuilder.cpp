@@ -1,5 +1,22 @@
 #include "casebuilder.hpp"
 
+#include <algorithm>
+
+std::vector<PlineVertex> CaseBuilder::reverseDirection(std::vector<PlineVertex> const &vertices) {
+  if (vertices.size() < 2) {
+    return vertices;
+  }
+  std::vector<PlineVertex> result = vertices;
+  std::reverse(result.begin(), result.end());
+  double firstBulge = result[0].bulge();
+  for (std::size_t i = 1; i < result.size(); ++i) {
+    result[i - 1].bulge() = -result[i].bulge();
+  }
+
+  result.back().bulge() = -firstBulge;
+  return result;
+}
+
 std::vector<PlineVertex> CaseBuilder::simpleRectangle() {
   std::vector<PlineVertex> result;
   result.reserve(4);

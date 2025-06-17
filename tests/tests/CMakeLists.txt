@@ -29,5 +29,8 @@ cavc_add_test(TEST_capi_combine_plines)
 
 # C++ API tests
 cavc_add_test(TEST_plinesegment)
+cavc_add_test(TEST_intrcircle2circle2)
+cavc_add_test(TEST_intrlineseg2circle2)
+cavc_add_test(TEST_intrlineseg2lineseg2)
 cavc_add_test(TEST_pline)
 cavc_add_test(TEST_staticspatialindex)

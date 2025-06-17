@@ -17,8 +17,14 @@ public:
   Polyline() : m_isClosed(false), m_vertexes() {}
 
   using PVertex = PlineVertex<Real>;
-  inline PVertex const &operator[](std::size_t i) const { return m_vertexes[i]; }
-  inline PVertex &operator[](std::size_t i) { return m_vertexes[i]; }
+  inline PVertex const &operator[](std::size_t i) const {
+    CAVC_ASSERT(i < m_vertexes.size(), "index out of bounds");
+    return m_vertexes[i];
+  }
+  inline PVertex &operator[](std::size_t i) {
+    CAVC_ASSERT(i < m_vertexes.size(), "index out of bounds");
+    return m_vertexes[i];
+  }
 
   bool isClosed() const { return m_isClosed; }
   bool &isClosed() { return m_isClosed; }
@@ -28,8 +34,14 @@ public:
 
   std::size_t size() const { return m_vertexes.size(); }
 
-  PVertex const &lastVertex() const { return m_vertexes.back(); }
-  PVertex &lastVertex() { return m_vertexes.back(); }
+  PVertex const &lastVertex() const {
+    CAVC_ASSERT(!m_vertexes.empty(), "cannot get last vertex of empty polyline");
+    return m_vertexes.back();
+  }
+  PVertex &lastVertex() {
+    CAVC_ASSERT(!m_vertexes.empty(), "cannot get last vertex of empty polyline");
+    return m_vertexes.back();
+  }
 
   std::vector<PVertex> &vertexes() { return m_vertexes; }
   std::vector<PVertex> const &vertexes() const { return m_vertexes; }
@@ -274,6 +286,11 @@ template <typename Real>
 Polyline<Real> convertArcsToLines(Polyline<Real> const &pline, Real error) {
   cavc::Polyline<Real> result;
   result.isClosed() = pline.isClosed();
+  // Handle empty polyline
+  if (pline.size() == 0) {
+    return result;
+  }
+
   auto visitor = [&](std::size_t i, std::size_t j) {
     const auto &v1 = pline[i];
     const auto &v2 = pline[j];

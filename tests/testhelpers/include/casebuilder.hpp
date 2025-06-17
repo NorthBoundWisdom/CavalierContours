@@ -7,6 +7,8 @@
 using PlineVertex = cavc::PlineVertex<double>;
 class CaseBuilder {
 public:
+  static std::vector<PlineVertex> reverseDirection(std::vector<PlineVertex> const &vertices);
+
   static std::vector<PlineVertex> simpleRectangle();
 
   static std::vector<PlineVertex> twoBadArcCase();
