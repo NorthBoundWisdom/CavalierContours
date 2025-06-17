@@ -3,7 +3,7 @@
 #include "cavc/polylineoffset.hpp"
 #include <iostream>
 #include <memory>
-#include <stdexcept>
+#include <span>
 
 #define CAVC_BEGIN_TRY_CATCH try {
 
@@ -17,7 +17,7 @@
 struct cavc_pline {
   cavc::Polyline<cavc_real> data;
   cavc_pline() = default;
-  cavc_pline(cavc::Polyline<cavc_real> &&data) noexcept : data(data) {}
+  cavc_pline(cavc::Polyline<cavc_real> &&p_data) noexcept : data(std::move(p_data)) {}
 };
 
 struct cavc_pline_list {
@@ -39,8 +39,12 @@ static void copy_to_pline(cavc_pline *api_pline, cavc_vertex const *vertex_data,
   api_pline->data.vertexes().clear();
   api_pline->data.vertexes().reserve(vertex_count);
 
-  for (uint32_t i = 0; i < vertex_count; ++i) {
-    api_pline->data.addVertex(vertex_data[i].x, vertex_data[i].y, vertex_data[i].bulge);
+  // Use std::span for safe buffer access
+  if (vertex_data != nullptr && vertex_count > 0) {
+    std::span<const cavc_vertex> vertices_span(vertex_data, vertex_count);
+    for (const auto &vertex : vertices_span) {
+      api_pline->data.addVertex(vertex.x, vertex.y, vertex.bulge);
+    }
   }
 }
 
@@ -48,9 +52,13 @@ static void copy_to_pline(cavc_pline *api_pline, cavc_vertex const *vertex_data,
 static void copy_to_vertex_data(cavc_pline const *api_pline, cavc_vertex *vertex_data) {
   auto const &pline = api_pline->data;
   uint32_t vertex_count = static_cast<uint32_t>(pline.size());
-  for (uint32_t i = 0; i < vertex_count; ++i) {
-    auto const &v = pline[i];
-    vertex_data[i] = cavc_vertex{v.x(), v.y(), v.bulge()};
+
+  if (vertex_data != nullptr && vertex_count > 0) {
+    std::span<cavc_vertex> output_span(vertex_data, vertex_count);
+    for (uint32_t i = 0; i < vertex_count; ++i) {
+      auto const &v = pline[i];
+      output_span[i] = cavc_vertex{v.x(), v.y(), v.bulge()};
+    }
   }
 }
 

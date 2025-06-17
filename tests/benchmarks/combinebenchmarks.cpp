@@ -21,7 +21,8 @@ struct CombineShiftedSetup {
     std::size_t shiftedCount = 16;
     shiftedProfiles.reserve(shiftedCount);
     for (std::size_t i = 0; i < shiftedCount; ++i) {
-      double angle = static_cast<double>(i) / shiftedCount * cavc::utils::tau<double>();
+      double angle =
+          static_cast<double>(i) / static_cast<double>(shiftedCount) * cavc::utils::tau<double>();
       shiftedProfiles.push_back(createShifted(angle));
     }
   }

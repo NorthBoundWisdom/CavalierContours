@@ -1,5 +1,6 @@
 #include "cavc/polyline.hpp"
 #include <benchmark/benchmark.h>
+
 struct TestProfile {
   std::size_t offsetCount;
   double offsetDelta;

@@ -3,7 +3,7 @@
 
 #include "internal/common.hpp"
 #include <cmath>
-#include <iterator>
+
 namespace cavc {
 namespace utils {
 // absolute threshold to be used for comparing reals generally

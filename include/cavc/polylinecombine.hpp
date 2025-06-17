@@ -63,8 +63,8 @@ template <typename Real> struct SlicePoint {
   Vector2<Real> pos;
   // indicates slice point is the start of a coincident slice
   bool startOfCoincidentSlice;
-  SlicePoint(Vector2<Real> const &pos, bool startOfCoincidentSlice)
-      : pos(pos), startOfCoincidentSlice(startOfCoincidentSlice) {}
+  SlicePoint(Vector2<Real> const &p_pos, bool p_startOfCoincidentSlice)
+      : pos(p_pos), startOfCoincidentSlice(p_startOfCoincidentSlice) {}
 };
 
 /// Slice the given pline at all of its intersects for combining. If useSecondIndex is true then the
@@ -196,10 +196,10 @@ void sliceAtIntersects(Polyline<Real> const &pline,
 
         // trim last added vertex and add final intersect position
         PlineVertex<Real> endVertex = PlineVertex<Real>(intersectPos, Real(0));
-        std::size_t nextIndex = utils::nextWrappingIndex(index, pline);
-        SplitResult<Real> split =
-            splitAtPoint(currSlice.lastVertex(), pline[nextIndex], intersectPos);
-        currSlice.lastVertex() = split.updatedStart;
+        std::size_t l_nextIndex = utils::nextWrappingIndex(index, pline);
+        SplitResult<Real> l_split =
+            splitAtPoint(currSlice.lastVertex(), pline[l_nextIndex], intersectPos);
+        currSlice.lastVertex() = l_split.updatedStart;
         internal::addOrReplaceIfSamePos(currSlice, endVertex);
         break;
       }

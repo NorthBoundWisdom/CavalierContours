@@ -35,9 +35,9 @@ template <typename Real> struct PlineCoincidentIntersect {
   /// Other end point of the coincident slice
   Vector2<Real> point2;
   PlineCoincidentIntersect() = default;
-  PlineCoincidentIntersect(std::size_t si1, std::size_t si2, Vector2<Real> const &point1,
-                           Vector2<Real> const &point2)
-      : sIndex1(si1), sIndex2(si2), point1(point1), point2(point2) {}
+  PlineCoincidentIntersect(std::size_t si1, std::size_t si2, Vector2<Real> const &p_point1,
+                           Vector2<Real> const &p_point2)
+      : sIndex1(si1), sIndex2(si2), point1(p_point1), point2(p_point2) {}
 };
 
 /// Holds a collection of intersects found

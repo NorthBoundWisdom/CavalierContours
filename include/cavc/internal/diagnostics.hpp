@@ -4,6 +4,7 @@
 #include <iomanip>
 #include <sstream>
 #include <string>
+
 namespace cavc {
 namespace internal {
 template <typename Real>

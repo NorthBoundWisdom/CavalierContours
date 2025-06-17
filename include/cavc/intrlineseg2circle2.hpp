@@ -1,6 +1,7 @@
 #ifndef CAVC_INTRLINESEG2CIRCLE2_HPP
 #define CAVC_INTRLINESEG2CIRCLE2_HPP
 #include "vector2.hpp"
+
 namespace cavc {
 template <typename Real> struct IntrLineSeg2Circle2Result {
   // number of interescts found (0, 1, or 2)

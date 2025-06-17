@@ -259,7 +259,6 @@ void ParallelOffsetIslands<Real>::createSlicesFromLoop(std::size_t loopIndex, Re
     std::sort(kvp.second.begin(), kvp.second.end(), cmp);
   }
 
-
   for (auto const &kvp : m_loopDissectionPoints) {
     // start index for the slice we're about to build
     std::size_t sIndex = kvp.first;
@@ -332,10 +331,10 @@ void ParallelOffsetIslands<Real>::createSlicesFromLoop(std::size_t loopIndex, Re
 
         // trim last added vertex and add final intersect position
         PlineVertex<Real> endVertex = PlineVertex<Real>(intersectPos, Real(0));
-        std::size_t nextIndex = utils::nextWrappingIndex(index, pline);
-        SplitResult<Real> split =
-            splitAtPoint(currSlice.pline.lastVertex(), pline[nextIndex], intersectPos);
-        currSlice.pline.lastVertex() = split.updatedStart;
+        std::size_t l_nextIndex = utils::nextWrappingIndex(index, pline);
+        SplitResult<Real> l_split =
+            splitAtPoint(currSlice.pline.lastVertex(), pline[l_nextIndex], intersectPos);
+        currSlice.pline.lastVertex() = l_split.updatedStart;
         internal::addOrReplaceIfSamePos(currSlice.pline, endVertex);
         currSlice.endLoopIndex = nextIntr->second[0].otherLoopIndex;
         break;

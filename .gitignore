@@ -9,6 +9,7 @@ install
 *.ts
 *.qm
 .vscode
+.clangd
 
 package
 dist

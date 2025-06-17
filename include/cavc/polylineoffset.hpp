@@ -2,8 +2,8 @@
 #define CAVC_POLYLINEOFFSET_HPP
 #include "polyline.hpp"
 #include "polylineintersects.hpp"
-#include <unordered_map>
 #include <map>
+#include <unordered_map>
 #include <vector>
 
 // This header has functions for offsetting polylines
@@ -505,17 +505,17 @@ Polyline<Real> createRawOffsetPline(Polyline<Real> const &pline, Real offset) {
 
   auto joinResultVisitor = [connectionArcsAreCCW](PlineOffsetSegment<Real> const &s1,
                                                   PlineOffsetSegment<Real> const &s2,
-                                                  Polyline<Real> &result) {
+                                                  Polyline<Real> &p_result) {
     const bool s1IsLine = s1.v1.bulgeIsZero();
     const bool s2IsLine = s2.v1.bulgeIsZero();
     if (s1IsLine && s2IsLine) {
-      internal::lineToLineJoin(s1, s2, connectionArcsAreCCW, result);
+      internal::lineToLineJoin(s1, s2, connectionArcsAreCCW, p_result);
     } else if (s1IsLine) {
-      internal::lineToArcJoin(s1, s2, connectionArcsAreCCW, result);
+      internal::lineToArcJoin(s1, s2, connectionArcsAreCCW, p_result);
     } else if (s2IsLine) {
-      internal::arcToLineJoin(s1, s2, connectionArcsAreCCW, result);
+      internal::arcToLineJoin(s1, s2, connectionArcsAreCCW, p_result);
     } else {
-      internal::arcToArcJoin(s1, s2, connectionArcsAreCCW, result);
+      internal::arcToArcJoin(s1, s2, connectionArcsAreCCW, p_result);
     }
   };
 
@@ -786,13 +786,13 @@ std::vector<OpenPolylineSlice<Real>> slicesFromRawOffset(Polyline<Real> const &o
           break;
         }
 
-        std::size_t nextIndex = utils::nextWrappingIndex(index, rawOffsetPline);
-        SplitResult<Real> split =
-            splitAtPoint(currSlice.lastVertex(), rawOffsetPline[nextIndex], intersectPos);
+        std::size_t l_nextIndex = utils::nextWrappingIndex(index, rawOffsetPline);
+        SplitResult<Real> l_split =
+            splitAtPoint(currSlice.lastVertex(), rawOffsetPline[l_nextIndex], intersectPos);
 
         PlineVertex<Real> sliceEndVertex = PlineVertex<Real>(intersectPos, Real(0));
         // check mid point is valid
-        Vector2<Real> mp = segMidpoint(split.updatedStart, sliceEndVertex);
+        Vector2<Real> mp = segMidpoint(l_split.updatedStart, sliceEndVertex);
         if (!internal::pointValidForOffset(originalPline, offset, origPlineSpatialIndex, mp,
                                            queryStack)) {
           isValidPline = false;
@@ -800,7 +800,7 @@ std::vector<OpenPolylineSlice<Real>> slicesFromRawOffset(Polyline<Real> const &o
         }
 
         // trim last added vertex and add final intersect position
-        currSlice.lastVertex() = split.updatedStart;
+        currSlice.lastVertex() = l_split.updatedStart;
         internal::addOrReplaceIfSamePos(currSlice, sliceEndVertex);
 
         break;
@@ -1089,13 +1089,13 @@ dualSliceAtIntersectsForOffset(Polyline<Real> const &originalPline,
           break;
         }
 
-        std::size_t nextIndex = utils::nextWrappingIndex(index, rawOffsetPline);
-        SplitResult<Real> split =
-            splitAtPoint(currSlice.lastVertex(), rawOffsetPline[nextIndex], intersectPos);
+        std::size_t l_nextIndex = utils::nextWrappingIndex(index, rawOffsetPline);
+        SplitResult<Real> l_split =
+            splitAtPoint(currSlice.lastVertex(), rawOffsetPline[l_nextIndex], intersectPos);
 
         PlineVertex<Real> sliceEndVertex = PlineVertex<Real>(intersectPos, Real(0));
         // check mid point is valid
-        Vector2<Real> mp = segMidpoint(split.updatedStart, sliceEndVertex);
+        Vector2<Real> mp = segMidpoint(l_split.updatedStart, sliceEndVertex);
         if (!internal::pointValidForOffset(originalPline, offset, origPlineSpatialIndex, mp,
                                            queryStack)) {
           isValidPline = false;
@@ -1103,7 +1103,7 @@ dualSliceAtIntersectsForOffset(Polyline<Real> const &originalPline,
         }
 
         // trim last added vertex and add final intersect position
-        currSlice.lastVertex() = split.updatedStart;
+        currSlice.lastVertex() = l_split.updatedStart;
         internal::addOrReplaceIfSamePos(currSlice, sliceEndVertex);
 
         break;

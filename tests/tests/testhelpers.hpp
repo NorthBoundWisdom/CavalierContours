@@ -26,10 +26,10 @@ struct PolylineProperties {
   cavc_real maxX;
   cavc_real maxY;
 
-  PolylineProperties(std::size_t vertexCount, cavc_real area, cavc_real pathLength, cavc_real minX,
-                     cavc_real minY, cavc_real maxX, cavc_real maxY)
-      : vertexCount(vertexCount), area(area), pathLength(pathLength), minX(minX), minY(minY),
-        maxX(maxX), maxY(maxY) {}
+  PolylineProperties(std::size_t p_vertexCount, cavc_real p_area, cavc_real p_pathLength,
+                     cavc_real p_minX, cavc_real p_minY, cavc_real p_maxX, cavc_real p_maxY)
+      : vertexCount(p_vertexCount), area(p_area), pathLength(p_pathLength), minX(p_minX),
+        minY(p_minY), maxX(p_maxX), maxY(p_maxY) {}
 
   PolylineProperties(cavc_pline *pline) {
     vertexCount = cavc_pline_vertex_count(pline);
@@ -65,7 +65,7 @@ inline std::ostream &operator<<(std::ostream &os, PolylineProperties const &p) {
 }
 
 // Custom function to print differences
-void PrintDiff(const PolylineProperties &expected, const PolylineProperties &actual) {
+inline void PrintDiff(const PolylineProperties &expected, const PolylineProperties &actual) {
   if (expected.vertexCount != actual.vertexCount) {
     std::cout << "vertexCount: expected " << expected.vertexCount << ", actual "
               << actual.vertexCount << "\n";

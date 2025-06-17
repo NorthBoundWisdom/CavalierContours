@@ -14,15 +14,16 @@ struct ParallelOffsetTestCase {
   cavc_pline *pline;
   std::vector<PolylineProperties> expectedResult;
 
-  ParallelOffsetTestCase(std::string name, cavc_real delta,
-                         std::vector<cavc_vertex> const &plineVertexes, bool isClosed,
-                         std::vector<PolylineProperties> expectedResult)
-      : name(std::move(name)), offsetDelta(delta),
-        pline(plineFromVertexes(plineVertexes, isClosed)),
-        expectedResult(std::move(expectedResult)) {}
+  ParallelOffsetTestCase(std::string p_name, cavc_real p_delta,
+                         std::vector<cavc_vertex> const &p_plineVertexes, bool isClosed,
+                         std::vector<PolylineProperties> p_expectedResult)
+      : name(std::move(p_name)), offsetDelta(p_delta),
+        pline(plineFromVertexes(p_plineVertexes, isClosed)),
+        expectedResult(std::move(p_expectedResult)) {}
 };
+namespace {
 
-std::ostream &operator<<(std::ostream &os, ParallelOffsetTestCase const &c) {
+[[maybe_unused]] std::ostream &operator<<(std::ostream &os, ParallelOffsetTestCase const &c) {
   os << "{ " << c.name << ", offsetDelta: " << c.offsetDelta << " }";
   return os;
 }
@@ -76,7 +77,6 @@ std::vector<ParallelOffsetTestCase> createSpecificCases() {
 
   return cases;
 }
-
 static std::vector<ParallelOffsetTestCase> specificCases = createSpecificCases();
 
 std::vector<ParallelOffsetTestCase> createSimpleCases() {
@@ -171,6 +171,7 @@ std::vector<ParallelOffsetTestCase> createSimpleCases() {
 
   return cases;
 }
+} // namespace
 
 static std::vector<ParallelOffsetTestCase> simpleCases = createSimpleCases();
 

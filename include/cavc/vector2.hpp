@@ -3,6 +3,7 @@
 #include "mathutils.hpp"
 #include "vector.hpp"
 #include <cmath>
+
 namespace cavc {
 template <typename Real> using Vector2 = Vector<Real, 2>;
 

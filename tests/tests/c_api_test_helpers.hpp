@@ -99,12 +99,12 @@ inline std::ostream &operator<<(std::ostream &os, cavc_point const &p) {
 }
 
 // helper to just create a cavc_pline from vertexes
-cavc_pline *plineFromVertexes(std::vector<cavc_vertex> const &vertexes, bool isClosed) {
+inline cavc_pline *plineFromVertexes(std::vector<cavc_vertex> const &vertexes, bool isClosed) {
   return cavc_pline_new(&vertexes[0], static_cast<uint32_t>(vertexes.size()), isClosed ? 1 : 0);
 }
 
 // reverses the direction of the polyline defined by vertexes
-void reverseDirection(std::vector<cavc_vertex> &vertexes) {
+inline void reverseDirection(std::vector<cavc_vertex> &vertexes) {
   if (vertexes.size() < 2) {
     return;
   }
@@ -119,7 +119,7 @@ void reverseDirection(std::vector<cavc_vertex> &vertexes) {
 }
 
 // create a reversed polyline from the given pline (caller must delete the created pline)
-cavc_pline *createRevseredPline(cavc_pline *pline) {
+inline cavc_pline *createRevseredPline(cavc_pline *pline) {
   uint32_t count = cavc_pline_vertex_count(pline);
   std::vector<cavc_vertex> vertexes(count);
   cavc_pline_vertex_data(pline, &vertexes[0]);

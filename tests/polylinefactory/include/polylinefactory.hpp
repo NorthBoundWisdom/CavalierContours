@@ -1,7 +1,9 @@
 #ifndef CAVC_POLYLINEFACTORY_HPP
 #define CAVC_POLYLINEFACTORY_HPP
+
 #include "cavaliercontours.h"
-#include "cavc/polyline.hpp"
+#include <memory>
+#include <vector>
 
 struct cavc_pline_deleter {
   void operator()(cavc_pline *pline) { cavc_pline_delete(pline); }

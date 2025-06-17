@@ -1,8 +1,6 @@
 #ifndef CAVC_POLYLINE_HPP
 #define CAVC_POLYLINE_HPP
-#include "intrcircle2circle2.hpp"
-#include "intrlineseg2circle2.hpp"
-#include "intrlineseg2lineseg2.hpp"
+
 #include "plinesegment.hpp"
 #include "staticspatialindex.hpp"
 #include "vector2.hpp"
@@ -304,8 +302,8 @@ Polyline<Real> convertArcsToLines(Polyline<Real> const &pline, Real error) {
       // add the start point
       result.addVertex(v1.x(), v1.y(), 0.0);
       // add the remaining points
-      for (std::size_t i = 1; i < segmentCount; ++i) {
-        Real angle = i * segmentSubAngle + startAngle;
+      for (std::size_t k = 1; k < segmentCount; ++k) {
+        Real angle = k * segmentSubAngle + startAngle;
         result.addVertex(arc.radius * std::cos(angle) + arc.center.x(),
                          arc.radius * std::sin(angle) + arc.center.y(), 0);
       }

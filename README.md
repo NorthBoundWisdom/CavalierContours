@@ -133,73 +133,73 @@ All offsets were performed with rounded joins (maintaining exact offset distance
 
 1e-2 (0.01) and 1e-3 (0.001) at the end of "arcs approx." refers to the error when approximating an arc as a series of line segments, it is the maximum allowed distance between the approximating line segments and the original arc. Note the profile vertex distances are in the range of 0-50 so the 1e-2 (0.01) error is intolerable for many applications, but significantly cuts down on the number of generated segments.
 
-| benchmark                   | vertex count | arcs approx. 1e-2 vertex count | arcs approx. 1e-3 vertex count | 
-|-----------------------------|--------------|--------------------------------|--------------------------------| 
-| BM_square                   | 4            | 4                              | 4                              | 
-| BM_circle                   | 2            | 142                            | 446                            | 
-| BM_roundedRectangle         | 8            | 56                             | 164                            | 
-| BM_Profile1                 | 6            | 80                             | 241                            | 
-| BM_Profile2                 | 11           | 162                            | 494                            | 
-| BM_PathologicalProfile1/10  | 10           | 400                            | 1240                           | 
-| BM_PathologicalProfile1/25  | 25           | 625                            | 1975                           | 
-| BM_PathologicalProfile1/50  | 50           | 900                            | 2800                           | 
-| BM_PathologicalProfile1/100 | 100          | 1300                           | 4000                           | 
+| benchmark                   | vertex count | arcs approx. 1e-2 vertex count | arcs approx. 1e-3 vertex count |
+| --------------------------- | ------------ | ------------------------------ | ------------------------------ |
+| BM_square                   | 4            | 4                              | 4                              |
+| BM_circle                   | 2            | 142                            | 446                            |
+| BM_roundedRectangle         | 8            | 56                             | 164                            |
+| BM_Profile1                 | 6            | 80                             | 241                            |
+| BM_Profile2                 | 11           | 162                            | 494                            |
+| BM_PathologicalProfile1/10  | 10           | 400                            | 1240                           |
+| BM_PathologicalProfile1/25  | 25           | 625                            | 1975                           |
+| BM_PathologicalProfile1/50  | 50           | 900                            | 2800                           |
+| BM_PathologicalProfile1/100 | 100          | 1300                           | 4000                           |
 
 All times are wall time. Exact details of the benchmark profiles and offsets run can be found under the dev project [here](https://github.com/jbuckmccready/CavalierContoursDev). For more on the clipper library see [[11]](#references).
 
 ### CavalierContours (Arcs Approximated) vs. Clipper
 
-| benchmark                   | cavc arcs approx. 1e-2 (ms) | clipper arcs approx. 1e-2 (ms) | cavc vs. clipper | 
-|-----------------------------|-----------------------------|--------------------------------|------------------| 
-| BM_square                   | **0.21**                    | 0.72                           | 3.5x             | 
-| BM_circle                   | **9.11**                    | 9.47                           | 1.0x             | 
-| BM_roundedRectangle         | **3.92**                    | 8.46                           | 2.2x             | 
-| BM_Profile1                 | 8.55                        | **6.33**                       | 0.7x             | 
-| BM_Profile2                 | 17.57                       | **16.59**                      | 0.9x             | 
-| BM_PathologicalProfile1/10  | **34.97**                   | 136.46                         | 3.9x             | 
-| BM_PathologicalProfile1/25  | **70.93**                   | 241.95                         | 3.4x             | 
-| BM_PathologicalProfile1/50  | **138.17**                  | 514.95                         | 3.7x             | 
-| BM_PathologicalProfile1/100 | **336.37**                  | 1347.09                        | 4.0x             | 
+| benchmark                   | cavc arcs approx. 1e-2 (ms) | clipper arcs approx. 1e-2 (ms) | cavc vs. clipper |
+| --------------------------- | --------------------------- | ------------------------------ | ---------------- |
+| BM_square                   | **0.21**                    | 0.72                           | 3.5x             |
+| BM_circle                   | **9.11**                    | 9.47                           | 1.0x             |
+| BM_roundedRectangle         | **3.92**                    | 8.46                           | 2.2x             |
+| BM_Profile1                 | 8.55                        | **6.33**                       | 0.7x             |
+| BM_Profile2                 | 17.57                       | **16.59**                      | 0.9x             |
+| BM_PathologicalProfile1/10  | **34.97**                   | 136.46                         | 3.9x             |
+| BM_PathologicalProfile1/25  | **70.93**                   | 241.95                         | 3.4x             |
+| BM_PathologicalProfile1/50  | **138.17**                  | 514.95                         | 3.7x             |
+| BM_PathologicalProfile1/100 | **336.37**                  | 1347.09                        | 4.0x             |
 
-| benchmark                   | cavc arcs approx. 1e-3 (ms) | clipper arcs approx. 1e-3 (ms) | cavc vs. clipper | 
-|-----------------------------|-----------------------------|--------------------------------|------------------| 
-| BM_square                   | **0.21**                    | 1.71                           | 8.1x             | 
-| BM_circle                   | **38.04**                   | 61.37                          | 1.6x             | 
-| BM_roundedRectangle         | **13.14**                   | 61.61                          | 4.7x             | 
-| BM_Profile1                 | 27.07                       | **24.44**                      | 0.9x             | 
-| BM_Profile2                 | **52.64**                   | 73.64                          | 1.4x             | 
-| BM_PathologicalProfile1/10  | **109.96**                  | 1383.46                        | 12.6x            | 
-| BM_PathologicalProfile1/25  | **227.51**                  | 2824.67                        | 12.4x            | 
-| BM_PathologicalProfile1/50  | **385.46**                  | 6170.26                        | 16.0x            | 
-| BM_PathologicalProfile1/100 | **821.15**                  | 15797.60                       | 19.2x            | 
+| benchmark                   | cavc arcs approx. 1e-3 (ms) | clipper arcs approx. 1e-3 (ms) | cavc vs. clipper |
+| --------------------------- | --------------------------- | ------------------------------ | ---------------- |
+| BM_square                   | **0.21**                    | 1.71                           | 8.1x             |
+| BM_circle                   | **38.04**                   | 61.37                          | 1.6x             |
+| BM_roundedRectangle         | **13.14**                   | 61.61                          | 4.7x             |
+| BM_Profile1                 | 27.07                       | **24.44**                      | 0.9x             |
+| BM_Profile2                 | **52.64**                   | 73.64                          | 1.4x             |
+| BM_PathologicalProfile1/10  | **109.96**                  | 1383.46                        | 12.6x            |
+| BM_PathologicalProfile1/25  | **227.51**                  | 2824.67                        | 12.4x            |
+| BM_PathologicalProfile1/50  | **385.46**                  | 6170.26                        | 16.0x            |
+| BM_PathologicalProfile1/100 | **821.15**                  | 15797.60                       | 19.2x            |
 
 The above benchmarks were taken by converting all arcs to line segments before running the profile through the offsetting algorithm. Even with no arcs in the input CavalierContours is competitive with a noticeable speedup in many cases. This is in part due to CavalierContours not having to construct rounded joins from line segments (an exact arc can be constructed instead).
 
 ### CavalierContours (Arcs Included) vs. Clipper
 
-| benchmark                   | cavc w/ arcs (ms) | clipper arcs approx. 1e-2 (ms) | cavc vs. clipper | 
-|-----------------------------|-------------------|--------------------------------|------------------| 
-| BM_square                   | **0.21**          | 0.72                           | 3.4x             | 
-| BM_circle                   | **0.12**          | 9.47                           | 76.4x            | 
-| BM_roundedRectangle         | **0.49**          | 8.46                           | 17.3x            | 
-| BM_Profile1                 | **0.76**          | 6.33                           | 8.4x             | 
-| BM_Profile2                 | **1.55**          | 16.59                          | 10.7x            | 
-| BM_PathologicalProfile1/10  | **1.61**          | 136.46                         | 84.9x            | 
-| BM_PathologicalProfile1/25  | **7.17**          | 241.95                         | 33.8x            | 
-| BM_PathologicalProfile1/50  | **23.98**         | 514.95                         | 21.5x            | 
-| BM_PathologicalProfile1/100 | **85.10**         | 1347.09                        | 15.8x            | 
+| benchmark                   | cavc w/ arcs (ms) | clipper arcs approx. 1e-2 (ms) | cavc vs. clipper |
+| --------------------------- | ----------------- | ------------------------------ | ---------------- |
+| BM_square                   | **0.21**          | 0.72                           | 3.4x             |
+| BM_circle                   | **0.12**          | 9.47                           | 76.4x            |
+| BM_roundedRectangle         | **0.49**          | 8.46                           | 17.3x            |
+| BM_Profile1                 | **0.76**          | 6.33                           | 8.4x             |
+| BM_Profile2                 | **1.55**          | 16.59                          | 10.7x            |
+| BM_PathologicalProfile1/10  | **1.61**          | 136.46                         | 84.9x            |
+| BM_PathologicalProfile1/25  | **7.17**          | 241.95                         | 33.8x            |
+| BM_PathologicalProfile1/50  | **23.98**         | 514.95                         | 21.5x            |
+| BM_PathologicalProfile1/100 | **85.10**         | 1347.09                        | 15.8x            |
 
-| benchmark                   | cavc w/ arcs (ms) | clipper arcs approx. 1e-3 (ms) | cavc vs. clipper | 
-|-----------------------------|-------------------|--------------------------------|------------------| 
-| BM_square                   | **0.21**          | 1.71                           | 8.1x             | 
-| BM_circle                   | **0.12**          | 61.37                          | 494.7x           | 
-| BM_roundedRectangle         | **0.49**          | 61.61                          | 126.1x           | 
-| BM_Profile1                 | **0.76**          | 24.44                          | 32.3x            | 
-| BM_Profile2                 | **1.55**          | 73.64                          | 47.6x            | 
-| BM_PathologicalProfile1/10  | **1.61**          | 1383.46                        | 861.0x           | 
-| BM_PathologicalProfile1/25  | **7.17**          | 2824.67                        | 394.2x           | 
-| BM_PathologicalProfile1/50  | **23.98**         | 6170.26                        | 257.3x           | 
-| BM_PathologicalProfile1/100 | **85.10**         | 15797.60                       | 185.6x           | 
+| benchmark                   | cavc w/ arcs (ms) | clipper arcs approx. 1e-3 (ms) | cavc vs. clipper |
+| --------------------------- | ----------------- | ------------------------------ | ---------------- |
+| BM_square                   | **0.21**          | 1.71                           | 8.1x             |
+| BM_circle                   | **0.12**          | 61.37                          | 494.7x           |
+| BM_roundedRectangle         | **0.49**          | 61.61                          | 126.1x           |
+| BM_Profile1                 | **0.76**          | 24.44                          | 32.3x            |
+| BM_Profile2                 | **1.55**          | 73.64                          | 47.6x            |
+| BM_PathologicalProfile1/10  | **1.61**          | 1383.46                        | 861.0x           |
+| BM_PathologicalProfile1/25  | **7.17**          | 2824.67                        | 394.2x           |
+| BM_PathologicalProfile1/50  | **23.98**         | 6170.26                        | 257.3x           |
+| BM_PathologicalProfile1/100 | **85.10**         | 15797.60                       | 185.6x           |
 
 The above benchmarks compare CavalierContours taking in the original input (arcs included) vs. Clipper (arcs must be approximated). The performance benefits of processing the arcs directly is quickly realized.
 

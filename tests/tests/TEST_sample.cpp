@@ -5,7 +5,6 @@
 
 #include "c_api_include/cavaliercontours.h"
 #include "c_api_test_helpers.hpp"
-#include "cavc/polyline.hpp"
 
 // Use basic gtest rather than gmock to make debug easier
 TEST(basic, basic_extent) {

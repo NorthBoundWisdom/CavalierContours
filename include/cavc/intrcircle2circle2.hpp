@@ -1,6 +1,7 @@
 #ifndef CAVC_INTRCIRCLE2CIRCLE2_HPP
 #define CAVC_INTRCIRCLE2CIRCLE2_HPP
 #include "vector2.hpp"
+
 namespace cavc {
 enum class Circle2Circle2IntrType {
   // no intersect between circles

@@ -7,9 +7,10 @@
 
 namespace t = testing;
 struct cavc_plineFunctionsTestCase {
-  cavc_plineFunctionsTestCase(std::string name, std::vector<cavc_vertex> vertexes, bool isClosed)
-      : name(std::move(name)), pline(plineFromVertexes(vertexes, isClosed)),
-        plineVertexes(std::move(vertexes)) {};
+  cavc_plineFunctionsTestCase(std::string p_name, std::vector<cavc_vertex> p_vertexes,
+                              bool isClosed)
+      : name(std::move(p_name)), pline(plineFromVertexes(p_vertexes, isClosed)),
+        plineVertexes(std::move(p_vertexes)) {};
 
   // simple name for the test case
   std::string name;
@@ -84,8 +85,8 @@ struct cavc_plineFunctionsTestCase {
 
   bool isClosed() const { return cavc_pline_is_closed(pline); }
 };
-
-std::ostream &operator<<(std::ostream &os, cavc_plineFunctionsTestCase const &c) {
+namespace {
+[[maybe_unused]] std::ostream &operator<<(std::ostream &os, cavc_plineFunctionsTestCase const &c) {
   os << c.name;
   return os;
 }
@@ -167,8 +168,8 @@ void addCircleCases(std::vector<cavc_plineFunctionsTestCase> &cases, cavc_real c
     std::vector<cavc_point> onCirclAt45deg;
     onCirclAt45deg.reserve(4);
     for (std::size_t i = 0; i < 4; ++i) {
-      cavc_real xCos = std::cos(PI() / 4 + i * PI() / 2);
-      cavc_real ySin = std::sin(PI() / 4 + i * PI() / 2);
+      cavc_real xCos = std::cos(PI() / 4 + static_cast<cavc_real>(i) * PI() / 2);
+      cavc_real ySin = std::sin(PI() / 4 + static_cast<cavc_real>(i) * PI() / 2);
 
       cavc_real x = circleCenter.x + insideDist * xCos;
       cavc_real y = circleCenter.y + insideDist * ySin;
@@ -534,6 +535,7 @@ std::vector<cavc_plineFunctionsTestCase> createHalfCircleCases() {
 
   return result;
 }
+} // namespace
 
 class cavc_plineFunctionTests : public t::TestWithParam<cavc_plineFunctionsTestCase> {
 protected:

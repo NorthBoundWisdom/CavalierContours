@@ -1,6 +1,11 @@
-cmake_minimum_required(VERSION 3.11)
+cmake_minimum_required(VERSION 3.21)
 
-include(clipper.cmake)
+option(CAVC_ENABLE_CLIPPER_BENCHMARKS "Enable clipper library for benchmarks (requires internet connection)" OFF)
+
+if(CAVC_ENABLE_CLIPPER_BENCHMARKS)
+    include(clipper.cmake)
+endif()
+
 find_package(benchmark REQUIRED)
 
 macro(add_benchmark name)
@@ -31,6 +36,8 @@ add_benchmark(pathlengthbenchmarks)
 add_benchmark(windingnumberbenchmarks)
 add_benchmark(combinebenchmarks)
 
-add_benchmark(clipperbenchmarks)
-target_link_libraries(clipperbenchmarks
-  PRIVATE clipper_static)
+if(CAVC_ENABLE_CLIPPER_BENCHMARKS)
+    add_benchmark(clipperbenchmarks)
+    target_link_libraries(clipperbenchmarks
+        PRIVATE clipper_static)
+endif()

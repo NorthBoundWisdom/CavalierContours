@@ -16,34 +16,33 @@ struct CombinePlinesTestCase {
   std::vector<PolylineProperties> expectedRemaining;
   std::vector<PolylineProperties> expectedSubtracted;
 
-  CombinePlinesTestCase(std::string name, int combineMode,
-                        std::vector<cavc_vertex> const &plineVertexesA,
-                        std::vector<cavc_vertex> const &plineVertexesB,
-                        std::vector<PolylineProperties> expectedRemaining,
-                        std::vector<PolylineProperties> expectedSubtracted)
-      : name(std::move(name)), combineMode(combineMode),
-        plineA(
-            cavc_pline_new(&plineVertexesA[0], static_cast<uint32_t>(plineVertexesA.size()), true)),
-        plineB(
-            cavc_pline_new(&plineVertexesA[0], static_cast<uint32_t>(plineVertexesB.size()), true)),
-        expectedRemaining(std::move(expectedRemaining)),
-        expectedSubtracted(std::move(expectedSubtracted)) {}
+  CombinePlinesTestCase(std::string p_name, int p_combineMode,
+                        std::vector<cavc_vertex> const &p_plineVertexesA,
+                        std::vector<cavc_vertex> const &p_plineVertexesB,
+                        std::vector<PolylineProperties> p_expectedRemaining,
+                        std::vector<PolylineProperties> p_expectedSubtracted)
+      : name(std::move(p_name)), combineMode(p_combineMode),
+        plineA(cavc_pline_new(&p_plineVertexesA[0], static_cast<uint32_t>(p_plineVertexesA.size()),
+                              true)),
+        plineB(cavc_pline_new(&p_plineVertexesA[0], static_cast<uint32_t>(p_plineVertexesB.size()),
+                              true)),
+        expectedRemaining(std::move(p_expectedRemaining)),
+        expectedSubtracted(std::move(p_expectedSubtracted)) {}
 
-  CombinePlinesTestCase(std::string name, int combineMode, cavc_pline *plineA, cavc_pline *plineB,
-                        std::vector<PolylineProperties> expectedRemaining,
-                        std::vector<PolylineProperties> expectedSubtracted)
-      : name(std::move(name)), combineMode(combineMode), plineA(plineA), plineB(plineB),
-
-        expectedRemaining(std::move(expectedRemaining)),
-        expectedSubtracted(std::move(expectedSubtracted)) {};
+  CombinePlinesTestCase(std::string p_name, int p_combineMode, cavc_pline *p_plineA,
+                        cavc_pline *p_plineB, std::vector<PolylineProperties> p_expectedRemaining,
+                        std::vector<PolylineProperties> p_expectedSubtracted)
+      : name(std::move(p_name)), combineMode(p_combineMode), plineA(p_plineA), plineB(p_plineB),
+        expectedRemaining(std::move(p_expectedRemaining)),
+        expectedSubtracted(std::move(p_expectedSubtracted)) {};
 };
-
-std::ostream &operator<<(std::ostream &os, CombinePlinesTestCase const &c) {
+namespace {
+[[maybe_unused]] std::ostream &operator<<(std::ostream &os, CombinePlinesTestCase const &c) {
   os << "{ " << c.name << ", combineMode: " << c.combineMode << " }";
   return os;
 }
 
-static std::vector<CombinePlinesTestCase> createSimpleCases() {
+std::vector<CombinePlinesTestCase> createSimpleCases() {
   std::vector<CombinePlinesTestCase> cases;
 
   {
@@ -97,7 +96,7 @@ static std::vector<CombinePlinesTestCase> createSimpleCases() {
   return cases;
 }
 
-static std::vector<CombinePlinesTestCase> createCoincidentCases() {
+std::vector<CombinePlinesTestCase> createCoincidentCases() {
   std::vector<CombinePlinesTestCase> cases;
 
   {
@@ -203,6 +202,7 @@ static std::vector<CombinePlinesTestCase> createCoincidentCases() {
 
   return cases;
 }
+} // namespace
 
 static std::vector<CombinePlinesTestCase> simpleCases = createSimpleCases();
 static std::vector<CombinePlinesTestCase> coincidentCases = createCoincidentCases();
