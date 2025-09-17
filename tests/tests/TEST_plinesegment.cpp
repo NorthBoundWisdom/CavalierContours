@@ -70,12 +70,12 @@
 #include <gtest/gtest.h>
 #include <iostream>
 
-using PlineVertex = cavc::PlineVertex<double>;
-using Vector2 = cavc::Vector2<double>;
-using AABB = cavc::AABB<double>;
-using ArcRadiusAndCenter = cavc::ArcRadiusAndCenter<double>;
-using SplitResult = cavc::SplitResult<double>;
-using IntrPlineSegsResult = cavc::IntrPlineSegsResult<double>;
+using PlineVertex = cavccpp::PlineVertex<double>;
+using Vector2 = cavccpp::Vector2<double>;
+using AABB = cavccpp::AABB<double>;
+using ArcRadiusAndCenter = cavccpp::ArcRadiusAndCenter<double>;
+using SplitResult = cavccpp::SplitResult<double>;
+using IntrPlineSegsResult = cavccpp::IntrPlineSegsResult<double>;
 
 namespace {
 
@@ -223,13 +223,13 @@ TEST(PlineVertexTest, BasicFunctionality) {
 TEST(ArcRadiusAndCenterTest, AllSegmentTypes) {
   // Positive quarter arc
   auto [v1_pqa, v2_pqa] = getPositiveQuarterArc();
-  auto arc_pqa = cavc::arcRadiusAndCenter(v1_pqa, v2_pqa);
+  auto arc_pqa = cavccpp::arcRadiusAndCenter(v1_pqa, v2_pqa);
   EXPECT_TRUE(approxEqual(arc_pqa.radius, 1.0));
   EXPECT_TRUE(approxEqual(arc_pqa.center, Vector2{0.0, 0.0}, 1e-15));
 
   // Negative quarter arc
   auto [v1_nqa, v2_nqa] = getNegativeQuarterArc();
-  auto arc_nqa = cavc::arcRadiusAndCenter(v1_nqa, v2_nqa);
+  auto arc_nqa = cavccpp::arcRadiusAndCenter(v1_nqa, v2_nqa);
   EXPECT_TRUE(approxEqual(arc_nqa.radius, 1.0));
   EXPECT_TRUE(approxEqual(arc_nqa.center, Vector2{0.0, 0.0}, 1e-15));
 
@@ -351,7 +351,7 @@ TEST(SegTangentVectorTest, AllSegmentTypes) {
   // Test positive quarter arc - tangent should be perpendicular to radius
   auto [v1_pqa, v2_pqa] = getPositiveQuarterArc();
   Vector2 midPoint_pqa = Vector2{std::sqrt(2.0) / 2.0, std::sqrt(2.0) / 2.0};
-  auto tangent_pqa = cavc::segTangentVector(v1_pqa, v2_pqa, midPoint_pqa);
+  auto tangent_pqa = cavccpp::segTangentVector(v1_pqa, v2_pqa, midPoint_pqa);
   // CCW arc tangent points perpendicular to radius - actual values show x<0, y>0
   EXPECT_NEAR(tangent_pqa.x(), -0.70710678118654768, 1e-10);
   EXPECT_NEAR(tangent_pqa.y(), 0.70710678118654768, 1e-10);
@@ -373,7 +373,7 @@ TEST(SegTangentVectorTest, AllSegmentTypes) {
   // Test negative horizontal half arc
   auto [v1_nha, v2_nha] = getNegativeHHalfArc();
   Vector2 midPoint_nha = Vector2{0.0, -1.0};
-  auto tangent_nha = cavc::segTangentVector(v1_nha, v2_nha, midPoint_nha);
+  auto tangent_nha = cavccpp::segTangentVector(v1_nha, v2_nha, midPoint_nha);
   // Fix expected values based on actual implementation
   EXPECT_TRUE(approxEqual(tangent_nha.x(), -1.0, 1e-6)); // Updated expectation
   EXPECT_TRUE(approxEqual(tangent_nha.y(), 0.0, 1e-6));
@@ -472,7 +472,7 @@ TEST(CreateFastApproxBoundingBoxTest, AllSegmentTypes) {
 
   // Test positive quarter arc
   auto [v1_pqa, v2_pqa] = getPositiveQuarterArc();
-  auto bbox_pqa = cavc::createFastApproxBoundingBox(v1_pqa, v2_pqa);
+  auto bbox_pqa = cavccpp::createFastApproxBoundingBox(v1_pqa, v2_pqa);
   EXPECT_LE(bbox_pqa.xMin, 0.0);
   EXPECT_GE(bbox_pqa.xMax, 1.0);
   EXPECT_LE(bbox_pqa.yMin, 0.0); // Updated: actual yMin is 0, not negative
@@ -480,7 +480,7 @@ TEST(CreateFastApproxBoundingBoxTest, AllSegmentTypes) {
 
   // Test positive horizontal half arc
   auto [v1_pha, v2_pha] = getPositiveHHalfArc();
-  auto bbox_pha = cavc::createFastApproxBoundingBox(v1_pha, v2_pha);
+  auto bbox_pha = cavccpp::createFastApproxBoundingBox(v1_pha, v2_pha);
   EXPECT_LE(bbox_pha.xMin, -1.0);
   EXPECT_GE(bbox_pha.xMax, 1.0);
   EXPECT_LE(bbox_pha.yMin, 0.0); // Updated: actual yMin is 0, not negative
@@ -488,7 +488,7 @@ TEST(CreateFastApproxBoundingBoxTest, AllSegmentTypes) {
 
   // Test negative horizontal half arc
   auto [v1_nha, v2_nha] = getNegativeHHalfArc();
-  auto bbox_nha = cavc::createFastApproxBoundingBox(v1_nha, v2_nha);
+  auto bbox_nha = cavccpp::createFastApproxBoundingBox(v1_nha, v2_nha);
   EXPECT_LE(bbox_nha.xMin, -1.0);
   EXPECT_GE(bbox_nha.xMax, -1.0);
   EXPECT_LE(bbox_nha.yMin, 1.0);
@@ -515,38 +515,40 @@ TEST(SegLengthTest, AllSegmentTypes) {
 
   // Test positive quarter arc
   auto [v1_pqa, v2_pqa] = getPositiveQuarterArc();
-  auto length_pqa = cavc::segLength(v1_pqa, v2_pqa);
-  double expected_pqa = cavc::utils::pi<double>() / 2.0; // Quarter circle arc length with radius 1
+  auto length_pqa = cavccpp::segLength(v1_pqa, v2_pqa);
+  double expected_pqa =
+      cavccpp::utils::pi<double>() / 2.0; // Quarter circle arc length with radius 1
   EXPECT_TRUE(approxEqual(length_pqa, expected_pqa, 1e-6));
 
   // Test negative quarter arc
   auto [v1_nqa, v2_nqa] = getNegativeQuarterArc();
-  auto length_nqa = cavc::segLength(v1_nqa, v2_nqa);
-  double expected_nqa = cavc::utils::pi<double>() / 2.0; // Quarter circle arc length with radius 1
+  auto length_nqa = cavccpp::segLength(v1_nqa, v2_nqa);
+  double expected_nqa =
+      cavccpp::utils::pi<double>() / 2.0; // Quarter circle arc length with radius 1
   EXPECT_TRUE(approxEqual(length_nqa, expected_nqa, 1e-6));
 
   // Test positive horizontal half arc
   auto [v1_pha, v2_pha] = getPositiveHHalfArc();
   auto length_pha = segLength(v1_pha, v2_pha);
-  double expected_pha = cavc::utils::pi<double>(); // Half circle arc length with radius 1
+  double expected_pha = cavccpp::utils::pi<double>(); // Half circle arc length with radius 1
   EXPECT_TRUE(approxEqual(length_pha, expected_pha, 1e-6));
 
   // Test negative horizontal half arc
   auto [v1_nha, v2_nha] = getNegativeHHalfArc();
   auto length_nha = segLength(v1_nha, v2_nha);
-  double expected_nha = cavc::utils::pi<double>();
+  double expected_nha = cavccpp::utils::pi<double>();
   EXPECT_TRUE(approxEqual(length_nha, expected_nha, 1e-6));
 
   // Test positive vertical half arc
   auto [v1_pva, v2_pva] = getPositiveVHalfArc();
   auto length_pva = segLength(v1_pva, v2_pva);
-  double expected_pva = cavc::utils::pi<double>();
+  double expected_pva = cavccpp::utils::pi<double>();
   EXPECT_TRUE(approxEqual(length_pva, expected_pva, 1e-6));
 
   // Test negative vertical half arc
   auto [v1_nva, v2_nva] = getNegativeVHalfArc();
   auto length_nva = segLength(v1_nva, v2_nva);
-  double expected_nva = cavc::utils::pi<double>();
+  double expected_nva = cavccpp::utils::pi<double>();
   EXPECT_TRUE(approxEqual(length_nva, expected_nva, 1e-6));
 }
 
@@ -591,12 +593,12 @@ TEST(SegMidpointTest, AllSegmentTypes) {
 
   // Test positive vertical half arc
   auto [v1_pva, v2_pva] = getPositiveVHalfArc();
-  auto mid_pva = cavc::segMidpoint(v1_pva, v2_pva);
+  auto mid_pva = cavccpp::segMidpoint(v1_pva, v2_pva);
   EXPECT_TRUE(approxEqual(mid_pva, Vector2{-1.0, 0.0}, 1e-6)); // Updated expectation
 
   // Test negative vertical half arc
   auto [v1_nva, v2_nva] = getNegativeVHalfArc();
-  auto mid_nva = cavc::segMidpoint(v1_nva, v2_nva);
+  auto mid_nva = cavccpp::segMidpoint(v1_nva, v2_nva);
   EXPECT_TRUE(approxEqual(mid_nva, Vector2{1.0, 0.0}, 1e-6)); // Updated expectation
 }
 
@@ -607,7 +609,7 @@ TEST(IntrPlineSegsTest, LineLineIntersections) {
   auto [v1_vl, v2_vl] = getVerticalLine();
 
   auto intr_result = intrPlineSegs(v1_hl, v2_hl, v1_vl, v2_vl);
-  EXPECT_EQ(intr_result.intrType, cavc::PlineSegIntrType::OneIntersect);
+  EXPECT_EQ(intr_result.intrType, cavccpp::PlineSegIntrType::OneIntersect);
   EXPECT_TRUE(approxEqual(intr_result.point1, Vector2{0.0, 0.0}));
 
   // Test parallel lines (no intersection)
@@ -617,7 +619,7 @@ TEST(IntrPlineSegsTest, LineLineIntersections) {
   PlineVertex h4{2.0, 1.0, 0.0};
 
   auto intr_parallel = intrPlineSegs(h1, h2, h3, h4);
-  EXPECT_EQ(intr_parallel.intrType, cavc::PlineSegIntrType::NoIntersect);
+  EXPECT_EQ(intr_parallel.intrType, cavccpp::PlineSegIntrType::NoIntersect);
 
   // Test overlapping lines
   PlineVertex o1{0.0, 0.0, 0.0};
@@ -626,7 +628,7 @@ TEST(IntrPlineSegsTest, LineLineIntersections) {
   PlineVertex o4{3.0, 0.0, 0.0};
 
   auto intr_overlap = intrPlineSegs(o1, o2, o3, o4);
-  EXPECT_EQ(intr_overlap.intrType, cavc::PlineSegIntrType::SegmentOverlap);
+  EXPECT_EQ(intr_overlap.intrType, cavccpp::PlineSegIntrType::SegmentOverlap);
 }
 
 TEST(IntrPlineSegsTest, LineArcIntersections) {
@@ -636,15 +638,15 @@ TEST(IntrPlineSegsTest, LineArcIntersections) {
   PlineVertex line_end{0.5, 1.0, 0.0};
 
   auto intr_result = intrPlineSegs(line_start, line_end, v1_pqa, v2_pqa);
-  EXPECT_TRUE(intr_result.intrType == cavc::PlineSegIntrType::OneIntersect ||
-              intr_result.intrType == cavc::PlineSegIntrType::TwoIntersects);
+  EXPECT_TRUE(intr_result.intrType == cavccpp::PlineSegIntrType::OneIntersect ||
+              intr_result.intrType == cavccpp::PlineSegIntrType::TwoIntersects);
 
   // Test line not intersecting with arc
   PlineVertex line_far_start{2.0, 0.0, 0.0};
   PlineVertex line_far_end{2.0, 1.0, 0.0};
 
   auto intr_no_result = intrPlineSegs(line_far_start, line_far_end, v1_pqa, v2_pqa);
-  EXPECT_EQ(intr_no_result.intrType, cavc::PlineSegIntrType::NoIntersect);
+  EXPECT_EQ(intr_no_result.intrType, cavccpp::PlineSegIntrType::NoIntersect);
 }
 
 TEST(IntrPlineSegsTest, ArcArcIntersections) {
@@ -653,19 +655,19 @@ TEST(IntrPlineSegsTest, ArcArcIntersections) {
   auto [v1_nqa, v2_nqa] = getNegativeQuarterArc();
 
   auto intr_result = intrPlineSegs(v1_pqa, v2_pqa, v1_nqa, v2_nqa);
-  EXPECT_TRUE(intr_result.intrType != cavc::PlineSegIntrType::NoIntersect);
+  EXPECT_TRUE(intr_result.intrType != cavccpp::PlineSegIntrType::NoIntersect);
 
   // Test two half arcs
   auto [v1_pha, v2_pha] = getPositiveHHalfArc();
   auto [v1_nha, v2_nha] = getNegativeHHalfArc();
 
-  auto intr_half_result = cavc::intrPlineSegs(v1_pha, v2_pha, v1_nha, v2_nha);
+  auto intr_half_result = cavccpp::intrPlineSegs(v1_pha, v2_pha, v1_nha, v2_nha);
   std::cout << "DEBUG: Half arc intersection type: " << static_cast<int>(intr_half_result.intrType)
             << " (NoIntersect=0, TangentIntersect=1, OneIntersect=2, TwoIntersects=3, "
                "SegmentOverlap=4, ArcOverlap=5)"
             << std::endl;
   // Based on debug output, actual result is OneIntersect (2), not ArcOverlap (5)
-  EXPECT_EQ(intr_half_result.intrType, cavc::PlineSegIntrType::OneIntersect);
+  EXPECT_EQ(intr_half_result.intrType, cavccpp::PlineSegIntrType::OneIntersect);
 }
 
 // New comprehensive edge case tests
@@ -678,17 +680,17 @@ TEST(IntrPlineSegsTest, QuarterArcDirectionalTests) {
 
   // NE vs NW quarter arcs
   auto intr_ne_nw = intrPlineSegs(v1_ne_pos, v2_ne_pos, v1_nw_pos, v2_nw_pos);
-  EXPECT_EQ(intr_ne_nw.intrType, cavc::PlineSegIntrType::OneIntersect);
+  EXPECT_EQ(intr_ne_nw.intrType, cavccpp::PlineSegIntrType::OneIntersect);
   EXPECT_TRUE(approxEqual(intr_ne_nw.point1, Vector2{0.0, 0.0}));
 
   // SE vs SW quarter arcs
   auto intr_se_sw = intrPlineSegs(v1_se_pos, v2_se_pos, v1_sw_pos, v2_sw_pos);
-  EXPECT_EQ(intr_se_sw.intrType, cavc::PlineSegIntrType::OneIntersect);
+  EXPECT_EQ(intr_se_sw.intrType, cavccpp::PlineSegIntrType::OneIntersect);
   EXPECT_TRUE(approxEqual(intr_se_sw.point1, Vector2{0.0, 0.0}));
 
   // NE vs SE quarter arcs (should not intersect if different centers)
   auto intr_ne_se = intrPlineSegs(v1_ne_pos, v2_ne_pos, v1_se_pos, v2_se_pos);
-  EXPECT_EQ(intr_ne_se.intrType, cavc::PlineSegIntrType::OneIntersect);
+  EXPECT_EQ(intr_ne_se.intrType, cavccpp::PlineSegIntrType::OneIntersect);
   EXPECT_TRUE(approxEqual(intr_ne_se.point1, Vector2{0.0, 0.0}));
 }
 
@@ -705,17 +707,17 @@ TEST(IntrPlineSegsTest, HalfArcVariousDirections) {
   std::cout << "DEBUG: H vs V half arc intersection type: " << static_cast<int>(intr_h_v.intrType)
             << std::endl;
   // DEBUG output shows type 5 = ArcOverlap, which makes sense for overlapping arcs
-  EXPECT_TRUE(intr_h_v.intrType == cavc::PlineSegIntrType::OneIntersect ||
-              intr_h_v.intrType == cavc::PlineSegIntrType::TwoIntersects ||
-              intr_h_v.intrType == cavc::PlineSegIntrType::NoIntersect ||
-              intr_h_v.intrType == cavc::PlineSegIntrType::ArcOverlap);
+  EXPECT_TRUE(intr_h_v.intrType == cavccpp::PlineSegIntrType::OneIntersect ||
+              intr_h_v.intrType == cavccpp::PlineSegIntrType::TwoIntersects ||
+              intr_h_v.intrType == cavccpp::PlineSegIntrType::NoIntersect ||
+              intr_h_v.intrType == cavccpp::PlineSegIntrType::ArcOverlap);
 
   // Vertical up vs down half arcs
   auto intr_v_up_down = intrPlineSegs(v1_v_up, v2_v_up, v1_v_down, v2_v_down);
   std::cout << "DEBUG: V up vs down intersection type: "
             << static_cast<int>(intr_v_up_down.intrType) << std::endl;
   EXPECT_TRUE(intr_v_up_down.intrType !=
-              cavc::PlineSegIntrType::SegmentOverlap); // Should not be line overlap
+              cavccpp::PlineSegIntrType::SegmentOverlap); // Should not be line overlap
 }
 
 TEST(IntrPlineSegsTest, DISABLED_ThreeQuarterArcIntersections) {
@@ -728,34 +730,34 @@ TEST(IntrPlineSegsTest, DISABLED_ThreeQuarterArcIntersections) {
   std::cout << "DEBUG: 3Q vs Q intersection type: " << static_cast<int>(intr_3q_q.intrType)
             << std::endl;
   // These may not intersect depending on their specific geometry
-  EXPECT_TRUE(intr_3q_q.intrType == cavc::PlineSegIntrType::NoIntersect ||
-              intr_3q_q.intrType == cavc::PlineSegIntrType::OneIntersect ||
-              intr_3q_q.intrType == cavc::PlineSegIntrType::TwoIntersects);
+  EXPECT_TRUE(intr_3q_q.intrType == cavccpp::PlineSegIntrType::NoIntersect ||
+              intr_3q_q.intrType == cavccpp::PlineSegIntrType::OneIntersect ||
+              intr_3q_q.intrType == cavccpp::PlineSegIntrType::TwoIntersects);
 
   // Three quarter CCW vs CW
   auto intr_3q_ccw_cw = intrPlineSegs(v1_3q_ccw, v2_3q_ccw, v1_3q_cw, v2_3q_cw);
   std::cout << "DEBUG: 3Q CCW vs CW intersection type: "
             << static_cast<int>(intr_3q_ccw_cw.intrType) << std::endl;
   // These should have some intersection or overlap
-  EXPECT_TRUE(intr_3q_ccw_cw.intrType == cavc::PlineSegIntrType::ArcOverlap ||
-              intr_3q_ccw_cw.intrType == cavc::PlineSegIntrType::OneIntersect ||
-              intr_3q_ccw_cw.intrType == cavc::PlineSegIntrType::TwoIntersects ||
-              intr_3q_ccw_cw.intrType == cavc::PlineSegIntrType::NoIntersect);
+  EXPECT_TRUE(intr_3q_ccw_cw.intrType == cavccpp::PlineSegIntrType::ArcOverlap ||
+              intr_3q_ccw_cw.intrType == cavccpp::PlineSegIntrType::OneIntersect ||
+              intr_3q_ccw_cw.intrType == cavccpp::PlineSegIntrType::TwoIntersects ||
+              intr_3q_ccw_cw.intrType == cavccpp::PlineSegIntrType::NoIntersect);
 }
 
 TEST(IntrPlineSegsTest, ArcOverlapEdgeCases) {
   // Test same arc (should be ArcOverlap)
   auto [v1_pos, v2_pos] = getPositiveQuarterArc();
   auto intr_same = intrPlineSegs(v1_pos, v2_pos, v1_pos, v2_pos);
-  EXPECT_EQ(intr_same.intrType, cavc::PlineSegIntrType::ArcOverlap);
+  EXPECT_EQ(intr_same.intrType, cavccpp::PlineSegIntrType::ArcOverlap);
 
   // Test arc with itself reversed (different start/end points)
   PlineVertex rev1{v2_pos.x(), v2_pos.y(), -v1_pos.bulge()};
   PlineVertex rev2{v1_pos.x(), v1_pos.y(), 0.0};
   auto intr_reversed = intrPlineSegs(v1_pos, v2_pos, rev1, rev2);
-  EXPECT_TRUE(intr_reversed.intrType == cavc::PlineSegIntrType::ArcOverlap ||
-              intr_reversed.intrType == cavc::PlineSegIntrType::OneIntersect ||
-              intr_reversed.intrType == cavc::PlineSegIntrType::TwoIntersects);
+  EXPECT_TRUE(intr_reversed.intrType == cavccpp::PlineSegIntrType::ArcOverlap ||
+              intr_reversed.intrType == cavccpp::PlineSegIntrType::OneIntersect ||
+              intr_reversed.intrType == cavccpp::PlineSegIntrType::TwoIntersects);
 }
 
 TEST(IntrPlineSegsTest, LineArcTangentTests) {
@@ -767,15 +769,15 @@ TEST(IntrPlineSegsTest, LineArcTangentTests) {
   PlineVertex line_tangent_end{1.5, 0.0, 0.0};
   auto intr_tangent = intrPlineSegs(line_tangent_start, line_tangent_end, v1_qa, v2_qa);
   // This should be tangent or one intersect at the start point
-  EXPECT_TRUE(intr_tangent.intrType == cavc::PlineSegIntrType::OneIntersect ||
-              intr_tangent.intrType == cavc::PlineSegIntrType::TangentIntersect ||
-              intr_tangent.intrType == cavc::PlineSegIntrType::NoIntersect);
+  EXPECT_TRUE(intr_tangent.intrType == cavccpp::PlineSegIntrType::OneIntersect ||
+              intr_tangent.intrType == cavccpp::PlineSegIntrType::TangentIntersect ||
+              intr_tangent.intrType == cavccpp::PlineSegIntrType::NoIntersect);
 
   // Line tangent to arc at arbitrary point
   PlineVertex line_tang_mid_start{0.707, 0.707, 0.0}; // Point on unit circle
   PlineVertex line_tang_mid_end{0.0, 1.414, 0.0};
   auto intr_tangent_mid = intrPlineSegs(line_tang_mid_start, line_tang_mid_end, v1_qa, v2_qa);
-  EXPECT_TRUE(intr_tangent_mid.intrType != cavc::PlineSegIntrType::TwoIntersects);
+  EXPECT_TRUE(intr_tangent_mid.intrType != cavccpp::PlineSegIntrType::TwoIntersects);
 }
 
 TEST(IntrPlineSegsTest, ExtremeArcAngles) {
@@ -788,10 +790,10 @@ TEST(IntrPlineSegsTest, ExtremeArcAngles) {
   std::cout << "DEBUG: Small arc vs line intersection type: "
             << static_cast<int>(intr_small_arc.intrType) << std::endl;
   // Small arc vs line may have different behaviors
-  EXPECT_TRUE(intr_small_arc.intrType == cavc::PlineSegIntrType::SegmentOverlap ||
-              intr_small_arc.intrType == cavc::PlineSegIntrType::OneIntersect ||
-              intr_small_arc.intrType == cavc::PlineSegIntrType::NoIntersect ||
-              intr_small_arc.intrType == cavc::PlineSegIntrType::TwoIntersects);
+  EXPECT_TRUE(intr_small_arc.intrType == cavccpp::PlineSegIntrType::SegmentOverlap ||
+              intr_small_arc.intrType == cavccpp::PlineSegIntrType::OneIntersect ||
+              intr_small_arc.intrType == cavccpp::PlineSegIntrType::NoIntersect ||
+              intr_small_arc.intrType == cavccpp::PlineSegIntrType::TwoIntersects);
 }
 
 TEST(IntrPlineSegsTest, DISABLED_ExtremeArcAngles2) {
@@ -802,7 +804,7 @@ TEST(IntrPlineSegsTest, DISABLED_ExtremeArcAngles2) {
   auto intr_big_arc = intrPlineSegs(almost_circle_start, almost_circle_end, v1_line, v2_line);
   std::cout << "DEBUG: Big arc vs line intersection type: "
             << static_cast<int>(intr_big_arc.intrType) << std::endl;
-  EXPECT_TRUE(intr_big_arc.intrType != cavc::PlineSegIntrType::SegmentOverlap);
+  EXPECT_TRUE(intr_big_arc.intrType != cavccpp::PlineSegIntrType::SegmentOverlap);
 }
 
 TEST(IntrPlineSegsTest, CoincidentEndpoints) {
@@ -814,7 +816,7 @@ TEST(IntrPlineSegsTest, CoincidentEndpoints) {
   PlineVertex qa2_end{-1.0, 0.0, 0.0};
 
   auto intr_connected = intrPlineSegs(v1_qa1, v2_qa1, qa2_start, qa2_end);
-  EXPECT_EQ(intr_connected.intrType, cavc::PlineSegIntrType::OneIntersect);
+  EXPECT_EQ(intr_connected.intrType, cavccpp::PlineSegIntrType::OneIntersect);
   EXPECT_TRUE(approxEqual(intr_connected.point1, Vector2{0.0, 1.0}));
 }
 
@@ -826,7 +828,7 @@ TEST(IntrPlineSegsTest, ConcentricArcs) {
   auto [v1_outer, v2_outer] = getPositiveHHalfArc(); // Radius 1.0
 
   auto intr_concentric = intrPlineSegs(inner_arc_start, inner_arc_end, v1_outer, v2_outer);
-  EXPECT_EQ(intr_concentric.intrType, cavc::PlineSegIntrType::NoIntersect);
+  EXPECT_EQ(intr_concentric.intrType, cavccpp::PlineSegIntrType::NoIntersect);
 }
 
 TEST(IntrPlineSegsTest, DegenerateLineSegments) {
@@ -837,7 +839,7 @@ TEST(IntrPlineSegsTest, DegenerateLineSegments) {
   auto [v1_line, v2_line] = getHorizontalLine();
   auto intr_point_line = intrPlineSegs(point1, point2, v1_line, v2_line);
   // This should be no intersection since it's a degenerate case
-  EXPECT_EQ(intr_point_line.intrType, cavc::PlineSegIntrType::NoIntersect);
+  EXPECT_EQ(intr_point_line.intrType, cavccpp::PlineSegIntrType::NoIntersect);
 }
 
 // Additional bug-hunting tests
@@ -852,10 +854,10 @@ TEST(IntrPlineSegsTest, DISABLED_BugHuntingEdgeCases) {
   std::cout << "DEBUG: Similar arcs intersection type: "
             << static_cast<int>(intr_similar_arcs.intrType) << std::endl;
   // Should detect very close but not identical arcs - allowing all reasonable outcomes
-  EXPECT_TRUE(intr_similar_arcs.intrType == cavc::PlineSegIntrType::ArcOverlap ||
-              intr_similar_arcs.intrType == cavc::PlineSegIntrType::OneIntersect ||
-              intr_similar_arcs.intrType == cavc::PlineSegIntrType::TwoIntersects ||
-              intr_similar_arcs.intrType == cavc::PlineSegIntrType::NoIntersect);
+  EXPECT_TRUE(intr_similar_arcs.intrType == cavccpp::PlineSegIntrType::ArcOverlap ||
+              intr_similar_arcs.intrType == cavccpp::PlineSegIntrType::OneIntersect ||
+              intr_similar_arcs.intrType == cavccpp::PlineSegIntrType::TwoIntersects ||
+              intr_similar_arcs.intrType == cavccpp::PlineSegIntrType::NoIntersect);
 
   // Test 2: Arc with zero bulge (should be treated as line)
   PlineVertex zero_bulge_start{0.0, 0.0, 0.0};
@@ -900,7 +902,7 @@ TEST(IntrPlineSegsTest, DISABLED_BugHuntingEdgeCases) {
       intrPlineSegs(line_at_arc_start, line_at_arc_end, v1_qa_test, v2_qa_test);
   std::cout << "DEBUG: Line at arc endpoint intersection type: "
             << static_cast<int>(intr_line_at_endpoint.intrType) << std::endl;
-  EXPECT_EQ(intr_line_at_endpoint.intrType, cavc::PlineSegIntrType::OneIntersect);
+  EXPECT_EQ(intr_line_at_endpoint.intrType, cavccpp::PlineSegIntrType::OneIntersect);
   EXPECT_TRUE(approxEqual(intr_line_at_endpoint.point1, Vector2{1.0, 0.0}));
 }
 
@@ -937,9 +939,9 @@ TEST(IntrPlineSegsTest, NumericalPrecisionTests) {
   auto intr_long_line = intrPlineSegs(long_line_start, long_line_end, v1_small_arc, v2_small_arc);
   std::cout << "DEBUG: Long line vs small arc intersection type: "
             << static_cast<int>(intr_long_line.intrType) << std::endl;
-  EXPECT_EQ(intr_long_line.intrType, cavc::PlineSegIntrType::OneIntersect);
+  EXPECT_EQ(intr_long_line.intrType, cavccpp::PlineSegIntrType::OneIntersect);
   // Relax precision requirement for very long line vs small arc due to numerical precision
-  if (intr_long_line.intrType == cavc::PlineSegIntrType::OneIntersect) {
+  if (intr_long_line.intrType == cavccpp::PlineSegIntrType::OneIntersect) {
     std::cout << "DEBUG: Intersection point: (" << intr_long_line.point1.x() << ", "
               << intr_long_line.point1.y() << ")" << std::endl;
     EXPECT_TRUE(approxEqual(intr_long_line.point1.x(), 1.0,
@@ -974,10 +976,10 @@ TEST(IntrPlineSegsTest, SpecialArcConfigurations) {
             << " SW: " << static_cast<int>(intr_diag_sw.intrType) << std::endl;
 
   // All should intersect at the origin or have one intersection point
-  EXPECT_TRUE(intr_diag_ne.intrType != cavc::PlineSegIntrType::SegmentOverlap);
-  EXPECT_TRUE(intr_diag_nw.intrType != cavc::PlineSegIntrType::SegmentOverlap);
-  EXPECT_TRUE(intr_diag_se.intrType != cavc::PlineSegIntrType::SegmentOverlap);
-  EXPECT_TRUE(intr_diag_sw.intrType != cavc::PlineSegIntrType::SegmentOverlap);
+  EXPECT_TRUE(intr_diag_ne.intrType != cavccpp::PlineSegIntrType::SegmentOverlap);
+  EXPECT_TRUE(intr_diag_nw.intrType != cavccpp::PlineSegIntrType::SegmentOverlap);
+  EXPECT_TRUE(intr_diag_se.intrType != cavccpp::PlineSegIntrType::SegmentOverlap);
+  EXPECT_TRUE(intr_diag_sw.intrType != cavccpp::PlineSegIntrType::SegmentOverlap);
 }
 
 // Critical bug detection test based on observations

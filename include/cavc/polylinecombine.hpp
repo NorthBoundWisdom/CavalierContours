@@ -7,7 +7,7 @@
 
 // This header has functions for combining closed polylines (performing boolean operations)
 
-namespace cavc {
+namespace cavccpp {
 namespace internal {
 template <typename Real> struct ProcessForCombineResult {
   std::vector<Polyline<Real>> coincidentSlices;
@@ -390,6 +390,103 @@ stitchOrderedSlicesIntoClosedPolylines(std::vector<Polyline<Real>> const &slices
 
   return result;
 }
+
+static std::function<std::size_t(std::size_t, std::vector<std::size_t> const &)>
+createUnionAndIntersectStitchSelector(std::size_t startOfCoincidentSlicesIdx) {
+  return [=](std::size_t currSliceIndex, std::vector<std::size_t> const &available) {
+    // attempt to select noncoincident slice
+    auto idx = std::find_if(available.begin(), available.end(),
+                            [&](auto i) { return i < startOfCoincidentSlicesIdx; });
+    if (idx == available.end()) {
+      // no noncoincident slices available
+      if (currSliceIndex >= startOfCoincidentSlicesIdx) {
+        // stitching coincident to coincident is never allowed (discarded)
+        return std::numeric_limits<std::size_t>::max();
+      }
+      // use first available
+      return available[0];
+    }
+
+    // use first noncoincident slice
+    return *idx;
+  };
+};
+
+static std::function<std::size_t(std::size_t, std::vector<std::size_t> const &)>
+createExcludeAndXORStitchSelector(std::size_t startOfPlineBSlicesIdx,
+                                  std::size_t startOfPlineACoincidentSlicesIdx,
+                                  std::size_t startOfPlineBCoincidentSlicesIdx) {
+  return [=](std::size_t currSliceIndex, std::vector<std::size_t> const &available) {
+    if (currSliceIndex >= startOfPlineACoincidentSlicesIdx) {
+      // current slice is coincident
+      if (currSliceIndex < startOfPlineBCoincidentSlicesIdx) {
+        // current coincident slice is from A, attempt to stitch to slice from plineB
+        auto idx = std::find_if(available.begin(), available.end(), [&](auto i) {
+          return i >= startOfPlineBSlicesIdx && i < startOfPlineACoincidentSlicesIdx;
+        });
+
+        if (idx != available.end()) {
+          // stitch to plineB slice
+          return *idx;
+        }
+
+        // attempt to stitch to slice from plineA
+        idx = std::find_if(available.begin(), available.end(),
+                           [&](auto i) { return i < startOfPlineBSlicesIdx; });
+
+        if (idx != available.end()) {
+          // stitch to plineA slice
+          return *idx;
+        }
+
+        // no noncoincident slices available and stitching coincident to coincident is never
+        // allowed (discarded)
+        return std::numeric_limits<std::size_t>::max();
+      }
+      // else current coincident slice is from B, attempt to stitch to slice from plineA
+      auto idx = std::find_if(available.begin(), available.end(),
+                              [&](auto i) { return i < startOfPlineBSlicesIdx; });
+
+      if (idx != available.end()) {
+        // stitch to plineA slice
+        return *idx;
+      }
+
+      // attempt to stitch to slice from plineB
+      idx = std::find_if(available.begin(), available.end(),
+                         [&](auto i) { return i < startOfPlineACoincidentSlicesIdx; });
+
+      if (idx != available.end()) {
+        // stitch to plineB slice
+        return *idx;
+      }
+
+      // no noncoincident slices available and stitching coincident to coincident is never
+      // allowed (discarded)
+      return std::numeric_limits<std::size_t>::max();
+    } else if (currSliceIndex < startOfPlineBSlicesIdx) {
+      // current slice is from plineA, attempt to stitch to slice from plineB
+      auto idx = std::find_if(available.begin(), available.end(), [&](auto i) {
+        return i >= startOfPlineBSlicesIdx && i < startOfPlineACoincidentSlicesIdx;
+      });
+
+      if (idx != available.end()) {
+        return *idx;
+      }
+
+      return available[0];
+    }
+    // else current slice is from plineB, attempt to stitch to slice from plineA
+    auto idx = std::find_if(available.begin(), available.end(),
+                            [&](auto i) { return i < startOfPlineBSlicesIdx; });
+
+    if (idx != available.end()) {
+      return *idx;
+    }
+
+    return available[0];
+  };
+};
 } // namespace internal
 
 /// Combine mode to apply to closed polylines, corresponds to the various boolean operations that
@@ -428,101 +525,6 @@ CombineResult<Real> combinePolylines(Polyline<Real> const &plineA, Polyline<Real
   // helper functions (assuming no intersects between A and B)
   auto isAInsideB = [&] { return pointInB(plineA[0].pos()); };
   auto isBInsideA = [&] { return pointInA(plineB[0].pos()); };
-
-  auto createUnionAndIntersectStitchSelector = [](std::size_t startOfCoincidentSlicesIdx) {
-    return [=](std::size_t currSliceIndex, std::vector<std::size_t> const &available) {
-      // attempt to select noncoincident slice
-      auto idx = std::find_if(available.begin(), available.end(),
-                              [&](auto i) { return i < startOfCoincidentSlicesIdx; });
-      if (idx == available.end()) {
-        // no noncoincident slices available
-        if (currSliceIndex >= startOfCoincidentSlicesIdx) {
-          // stitching coincident to coincident is never allowed (discarded)
-          return std::numeric_limits<std::size_t>::max();
-        }
-        // use first available
-        return available[0];
-      }
-
-      // use first noncoincident slice
-      return *idx;
-    };
-  };
-
-  auto createExcludeAndXORStitchSelector = [](std::size_t startOfPlineBSlicesIdx,
-                                              std::size_t startOfPlineACoincidentSlicesIdx,
-                                              std::size_t startOfPlineBCoincidentSlicesIdx) {
-    return [=](std::size_t currSliceIndex, std::vector<std::size_t> const &available) {
-      if (currSliceIndex >= startOfPlineACoincidentSlicesIdx) {
-        // current slice is coincident
-        if (currSliceIndex < startOfPlineBCoincidentSlicesIdx) {
-          // current coincident slice is from A, attempt to stitch to slice from plineB
-          auto idx = std::find_if(available.begin(), available.end(), [&](auto i) {
-            return i >= startOfPlineBSlicesIdx && i < startOfPlineACoincidentSlicesIdx;
-          });
-
-          if (idx != available.end()) {
-            // stitch to plineB slice
-            return *idx;
-          }
-
-          // attempt to stitch to slice from plineA
-          idx = std::find_if(available.begin(), available.end(),
-                             [&](auto i) { return i < startOfPlineBSlicesIdx; });
-
-          if (idx != available.end()) {
-            // stitch to plineA slice
-            return *idx;
-          }
-
-          // no noncoincident slices available and stitching coincident to coincident is never
-          // allowed (discarded)
-          return std::numeric_limits<std::size_t>::max();
-        }
-        // else current coincident slice is from B, attempt to stitch to slice from plineA
-        auto idx = std::find_if(available.begin(), available.end(),
-                                [&](auto i) { return i < startOfPlineBSlicesIdx; });
-
-        if (idx != available.end()) {
-          // stitch to plineA slice
-          return *idx;
-        }
-
-        // attempt to stitch to slice from plineB
-        idx = std::find_if(available.begin(), available.end(),
-                           [&](auto i) { return i < startOfPlineACoincidentSlicesIdx; });
-
-        if (idx != available.end()) {
-          // stitch to plineB slice
-          return *idx;
-        }
-
-        // no noncoincident slices available and stitching coincident to coincident is never
-        // allowed (discarded)
-        return std::numeric_limits<std::size_t>::max();
-      } else if (currSliceIndex < startOfPlineBSlicesIdx) {
-        // current slice is from plineA, attempt to stitch to slice from plineB
-        auto idx = std::find_if(available.begin(), available.end(), [&](auto i) {
-          return i >= startOfPlineBSlicesIdx && i < startOfPlineACoincidentSlicesIdx;
-        });
-
-        if (idx != available.end()) {
-          return *idx;
-        }
-
-        return available[0];
-      }
-      // else current slice is from plineB, attempt to stitch to slice from plineA
-      auto idx = std::find_if(available.begin(), available.end(),
-                              [&](auto i) { return i < startOfPlineBSlicesIdx; });
-
-      if (idx != available.end()) {
-        return *idx;
-      }
-
-      return available[0];
-    };
-  };
 
   auto performUnion = [&] {
     if (combineInfo.completelyCoincident()) {
@@ -682,5 +684,5 @@ CombineResult<Real> combinePolylines(Polyline<Real> const &plineA, Polyline<Real
 
   return result;
 }
-} // namespace cavc
+} // namespace cavccpp
 #endif // CAVC_POLYLINECOMBINE_HPP

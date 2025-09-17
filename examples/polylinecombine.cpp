@@ -1,6 +1,6 @@
 #include "cavc/polylinecombine.hpp"
 
-using namespace cavc;
+using namespace cavccpp;
 
 int main(int argc, char *argv[]) {
   (void)argc;

@@ -2,7 +2,7 @@
 #define CAVC_INTRLINESEG2CIRCLE2_HPP
 #include "vector2.hpp"
 
-namespace cavc {
+namespace cavccpp {
 template <typename Real> struct IntrLineSeg2Circle2Result {
   // number of interescts found (0, 1, or 2)
   int numIntersects;
@@ -65,6 +65,6 @@ IntrLineSeg2Circle2Result<Real> intrLineSeg2Circle2(Vector2<Real> const &p0,
   CAVC_ASSERT(result.numIntersects >= 0 && result.numIntersects <= 2, "invalid intersect count");
   return result;
 }
-} // namespace cavc
+} // namespace cavccpp
 
 #endif // CAVC_INTRLINESEG2CIRCLE2_HPP

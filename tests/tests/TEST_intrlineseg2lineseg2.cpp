@@ -6,9 +6,9 @@
 #include <cavc/mathutils.hpp>
 #include <cavc/vector2.hpp>
 
-using Vector2 = cavc::Vector2<double>;
-using IntrLineSeg2LineSeg2Result = cavc::IntrLineSeg2LineSeg2Result<double>;
-using LineSeg2LineSeg2IntrType = cavc::LineSeg2LineSeg2IntrType;
+using Vector2 = cavccpp::Vector2<double>;
+using IntrLineSeg2LineSeg2Result = cavccpp::IntrLineSeg2LineSeg2Result<double>;
+using LineSeg2LineSeg2IntrType = cavccpp::LineSeg2LineSeg2IntrType;
 
 namespace {
 
@@ -31,7 +31,7 @@ TEST(intrlineseg2lineseg2, true_intersection_perpendicular_cross) {
   Vector2 v1{0.0, -1.0};
   Vector2 v2{0.0, 1.0};
 
-  auto result = cavc::intrLineSeg2LineSeg2(u1, u2, v1, v2);
+  auto result = cavccpp::intrLineSeg2LineSeg2(u1, u2, v1, v2);
   EXPECT_EQ(result.intrType, LineSeg2LineSeg2IntrType::True);
   EXPECT_TRUE(approxEqual(result.point, Vector2{0.0, 0.0}));
 }
@@ -43,7 +43,7 @@ TEST(intrlineseg2lineseg2, true_intersection_diagonal_cross) {
   Vector2 v1{0.0, 2.0};
   Vector2 v2{2.0, 0.0};
 
-  auto result = cavc::intrLineSeg2LineSeg2(u1, u2, v1, v2);
+  auto result = cavccpp::intrLineSeg2LineSeg2(u1, u2, v1, v2);
   EXPECT_EQ(result.intrType, LineSeg2LineSeg2IntrType::True);
   EXPECT_TRUE(approxEqual(result.point, Vector2{1.0, 1.0}));
 }
@@ -55,7 +55,7 @@ TEST(intrlineseg2lineseg2, true_intersection_at_endpoint) {
   Vector2 v1{1.0, 0.0};
   Vector2 v2{1.0, 1.0};
 
-  auto result = cavc::intrLineSeg2LineSeg2(u1, u2, v1, v2);
+  auto result = cavccpp::intrLineSeg2LineSeg2(u1, u2, v1, v2);
   EXPECT_EQ(result.intrType, LineSeg2LineSeg2IntrType::True);
   EXPECT_TRUE(approxEqual(result.point, Vector2{1.0, 0.0}));
 }
@@ -67,7 +67,7 @@ TEST(intrlineseg2lineseg2, true_intersection_t_junction) {
   Vector2 v1{1.0, -1.0};
   Vector2 v2{1.0, 0.0};
 
-  auto result = cavc::intrLineSeg2LineSeg2(u1, u2, v1, v2);
+  auto result = cavccpp::intrLineSeg2LineSeg2(u1, u2, v1, v2);
   EXPECT_EQ(result.intrType, LineSeg2LineSeg2IntrType::True);
   EXPECT_TRUE(approxEqual(result.point, Vector2{1.0, 0.0}));
 }
@@ -79,7 +79,7 @@ TEST(intrlineseg2lineseg2, true_intersection_point_segments) {
   Vector2 v1{1.0, 1.0};
   Vector2 v2{1.0, 1.0};
 
-  auto result = cavc::intrLineSeg2LineSeg2(u1, u2, v1, v2);
+  auto result = cavccpp::intrLineSeg2LineSeg2(u1, u2, v1, v2);
   EXPECT_EQ(result.intrType, LineSeg2LineSeg2IntrType::True);
   EXPECT_TRUE(approxEqual(result.point, Vector2{1.0, 1.0}));
 }
@@ -91,7 +91,7 @@ TEST(intrlineseg2lineseg2, true_intersection_point_on_segment) {
   Vector2 v1{0.0, 1.0}; // Line segment containing the point
   Vector2 v2{2.0, 1.0};
 
-  auto result = cavc::intrLineSeg2LineSeg2(u1, u2, v1, v2);
+  auto result = cavccpp::intrLineSeg2LineSeg2(u1, u2, v1, v2);
   EXPECT_EQ(result.intrType, LineSeg2LineSeg2IntrType::True);
   EXPECT_TRUE(approxEqual(result.point, Vector2{1.0, 1.0}));
 }
@@ -105,7 +105,7 @@ TEST(intrlineseg2lineseg2, false_intersection_would_meet_if_extended) {
   Vector2 v1{2.0, -1.0}; // Would intersect at (2,0) if u1-u2 extended
   Vector2 v2{2.0, 1.0};
 
-  auto result = cavc::intrLineSeg2LineSeg2(u1, u2, v1, v2);
+  auto result = cavccpp::intrLineSeg2LineSeg2(u1, u2, v1, v2);
   EXPECT_EQ(result.intrType, LineSeg2LineSeg2IntrType::False);
   EXPECT_TRUE(approxEqual(result.point, Vector2{2.0, 0.0}));
   EXPECT_TRUE(result.t0 > 1.0);                      // Extension of first segment
@@ -119,7 +119,7 @@ TEST(intrlineseg2lineseg2, false_intersection_both_need_extension) {
   Vector2 v1{1.5, -0.5};
   Vector2 v2{1.5, 0.5};
 
-  auto result = cavc::intrLineSeg2LineSeg2(u1, u2, v1, v2);
+  auto result = cavccpp::intrLineSeg2LineSeg2(u1, u2, v1, v2);
   EXPECT_EQ(result.intrType, LineSeg2LineSeg2IntrType::False);
   EXPECT_TRUE(result.t0 > 1.0);                      // Extension of first segment
   EXPECT_TRUE(result.t1 >= 0.0 && result.t1 <= 1.0); // Within second segment
@@ -134,7 +134,7 @@ TEST(intrlineseg2lineseg2, no_intersection_parallel_separate) {
   Vector2 v1{0.0, 1.0};
   Vector2 v2{1.0, 1.0};
 
-  auto result = cavc::intrLineSeg2LineSeg2(u1, u2, v1, v2);
+  auto result = cavccpp::intrLineSeg2LineSeg2(u1, u2, v1, v2);
   EXPECT_EQ(result.intrType, LineSeg2LineSeg2IntrType::None);
 }
 
@@ -145,7 +145,7 @@ TEST(intrlineseg2lineseg2, no_intersection_skew_segments) {
   Vector2 v1{2.0, 1.0};
   Vector2 v2{3.0, 2.0};
 
-  auto result = cavc::intrLineSeg2LineSeg2(u1, u2, v1, v2);
+  auto result = cavccpp::intrLineSeg2LineSeg2(u1, u2, v1, v2);
   EXPECT_EQ(result.intrType, LineSeg2LineSeg2IntrType::False); // Would intersect if extended
 }
 
@@ -156,7 +156,7 @@ TEST(intrlineseg2lineseg2, no_intersection_point_segments_different) {
   Vector2 v1{1.0, 1.0};
   Vector2 v2{1.0, 1.0};
 
-  auto result = cavc::intrLineSeg2LineSeg2(u1, u2, v1, v2);
+  auto result = cavccpp::intrLineSeg2LineSeg2(u1, u2, v1, v2);
   EXPECT_EQ(result.intrType, LineSeg2LineSeg2IntrType::None);
 }
 
@@ -167,7 +167,7 @@ TEST(intrlineseg2lineseg2, no_intersection_point_not_on_segment) {
   Vector2 v1{0.0, 0.0}; // Line segment
   Vector2 v2{2.0, 0.0};
 
-  auto result = cavc::intrLineSeg2LineSeg2(u1, u2, v1, v2);
+  auto result = cavccpp::intrLineSeg2LineSeg2(u1, u2, v1, v2);
   EXPECT_EQ(result.intrType, LineSeg2LineSeg2IntrType::None);
 }
 
@@ -180,7 +180,7 @@ TEST(intrlineseg2lineseg2, coincident_complete_overlap) {
   Vector2 v1{0.0, 0.0};
   Vector2 v2{2.0, 0.0};
 
-  auto result = cavc::intrLineSeg2LineSeg2(u1, u2, v1, v2);
+  auto result = cavccpp::intrLineSeg2LineSeg2(u1, u2, v1, v2);
   EXPECT_EQ(result.intrType, LineSeg2LineSeg2IntrType::Coincident);
   EXPECT_TRUE(approxEqual(result.t0, 0.0));
   EXPECT_TRUE(approxEqual(result.t1, 1.0));
@@ -193,7 +193,7 @@ TEST(intrlineseg2lineseg2, coincident_partial_overlap) {
   Vector2 v1{1.0, 0.0};
   Vector2 v2{2.0, 0.0};
 
-  auto result = cavc::intrLineSeg2LineSeg2(u1, u2, v1, v2);
+  auto result = cavccpp::intrLineSeg2LineSeg2(u1, u2, v1, v2);
   EXPECT_EQ(result.intrType, LineSeg2LineSeg2IntrType::Coincident);
   // v1 to v2 should map to parameters on the u1-u2 line
   EXPECT_TRUE(result.t0 >= 0.0 && result.t0 <= 1.0);
@@ -208,7 +208,7 @@ TEST(intrlineseg2lineseg2, coincident_reversed_overlap) {
   Vector2 v1{2.0, 0.0};
   Vector2 v2{0.0, 0.0};
 
-  auto result = cavc::intrLineSeg2LineSeg2(u1, u2, v1, v2);
+  auto result = cavccpp::intrLineSeg2LineSeg2(u1, u2, v1, v2);
   EXPECT_EQ(result.intrType, LineSeg2LineSeg2IntrType::Coincident);
   EXPECT_TRUE(approxEqual(result.t0, 0.0));
   EXPECT_TRUE(approxEqual(result.t1, 1.0));
@@ -221,7 +221,7 @@ TEST(intrlineseg2lineseg2, coincident_endpoint_overlap) {
   Vector2 v1{1.0, 0.0};
   Vector2 v2{2.0, 0.0};
 
-  auto result = cavc::intrLineSeg2LineSeg2(u1, u2, v1, v2);
+  auto result = cavccpp::intrLineSeg2LineSeg2(u1, u2, v1, v2);
   EXPECT_EQ(result.intrType, LineSeg2LineSeg2IntrType::True); // Single point intersection
   EXPECT_TRUE(approxEqual(result.point, Vector2{1.0, 0.0}));
 }
@@ -235,7 +235,7 @@ TEST(intrlineseg2lineseg2, vertical_segments_intersect) {
   Vector2 v1{1.0, 1.0};
   Vector2 v2{1.0, 3.0};
 
-  auto result = cavc::intrLineSeg2LineSeg2(u1, u2, v1, v2);
+  auto result = cavccpp::intrLineSeg2LineSeg2(u1, u2, v1, v2);
   EXPECT_EQ(result.intrType, LineSeg2LineSeg2IntrType::Coincident);
 }
 
@@ -246,7 +246,7 @@ TEST(intrlineseg2lineseg2, horizontal_segments_intersect) {
   Vector2 v1{1.0, 1.0};
   Vector2 v2{3.0, 1.0};
 
-  auto result = cavc::intrLineSeg2LineSeg2(u1, u2, v1, v2);
+  auto result = cavccpp::intrLineSeg2LineSeg2(u1, u2, v1, v2);
   EXPECT_EQ(result.intrType, LineSeg2LineSeg2IntrType::Coincident);
 }
 
@@ -257,7 +257,7 @@ TEST(intrlineseg2lineseg2, very_small_segments) {
   Vector2 v1{0.0005, -0.0005};
   Vector2 v2{0.0005, 0.002};
 
-  auto result = cavc::intrLineSeg2LineSeg2(u1, u2, v1, v2);
+  auto result = cavccpp::intrLineSeg2LineSeg2(u1, u2, v1, v2);
   // Should detect some form of intersection or near-intersection
   EXPECT_TRUE(result.intrType != LineSeg2LineSeg2IntrType::None);
 }
@@ -269,7 +269,7 @@ TEST(intrlineseg2lineseg2, large_coordinates) {
   Vector2 v1{1000.5, 999.0};
   Vector2 v2{1000.5, 1001.0};
 
-  auto result = cavc::intrLineSeg2LineSeg2(u1, u2, v1, v2);
+  auto result = cavccpp::intrLineSeg2LineSeg2(u1, u2, v1, v2);
   EXPECT_EQ(result.intrType, LineSeg2LineSeg2IntrType::True);
   EXPECT_TRUE(approxEqual(result.point, Vector2{1000.5, 1000.0}));
 }
@@ -281,7 +281,7 @@ TEST(intrlineseg2lineseg2, negative_coordinates) {
   Vector2 v1{-2.0, -2.0};
   Vector2 v2{-1.0, -1.0};
 
-  auto result = cavc::intrLineSeg2LineSeg2(u1, u2, v1, v2);
+  auto result = cavccpp::intrLineSeg2LineSeg2(u1, u2, v1, v2);
   EXPECT_EQ(result.intrType, LineSeg2LineSeg2IntrType::True);
   EXPECT_TRUE(approxEqual(result.point, Vector2{-1.5, -1.5}));
 }
@@ -293,7 +293,7 @@ TEST(intrlineseg2lineseg2, nearly_parallel_segments) {
   Vector2 v1{0.0, 1e-10}; // Very slight angle
   Vector2 v2{1.0, 1e-10};
 
-  auto result = cavc::intrLineSeg2LineSeg2(u1, u2, v1, v2);
+  auto result = cavccpp::intrLineSeg2LineSeg2(u1, u2, v1, v2);
   // Should be treated as parallel due to threshold
   EXPECT_TRUE(result.intrType == LineSeg2LineSeg2IntrType::Coincident ||
               result.intrType == LineSeg2LineSeg2IntrType::None);
@@ -301,13 +301,13 @@ TEST(intrlineseg2lineseg2, nearly_parallel_segments) {
 
 TEST(intrlineseg2lineseg2, precision_boundary_test) {
   // Test at the precision boundary for intersection detection
-  double eps = cavc::utils::realThreshold<double>();
+  double eps = cavccpp::utils::realThreshold<double>();
   Vector2 u1{0.0, 0.0};
   Vector2 u2{1.0, 0.0};
   Vector2 v1{0.5, eps / 2.0};
   Vector2 v2{0.5, -eps / 2.0};
 
-  auto result = cavc::intrLineSeg2LineSeg2(u1, u2, v1, v2);
+  auto result = cavccpp::intrLineSeg2LineSeg2(u1, u2, v1, v2);
   // Should detect intersection due to threshold tolerance
   EXPECT_TRUE(result.intrType == LineSeg2LineSeg2IntrType::True);
 }
@@ -319,7 +319,7 @@ TEST(intrlineseg2lineseg2, parametric_values_validation) {
   Vector2 v1{2.0, -1.0};
   Vector2 v2{2.0, 1.0}; // 2 units long, intersects at (2,0)
 
-  auto result = cavc::intrLineSeg2LineSeg2(u1, u2, v1, v2);
+  auto result = cavccpp::intrLineSeg2LineSeg2(u1, u2, v1, v2);
   EXPECT_EQ(result.intrType, LineSeg2LineSeg2IntrType::True);
   EXPECT_TRUE(approxEqual(result.point, Vector2{2.0, 0.0}));
 
@@ -335,7 +335,7 @@ TEST(intrlineseg2lineseg2, collinear_segments_no_overlap) {
   Vector2 v1{2.0, 0.0};
   Vector2 v2{3.0, 0.0};
 
-  auto result = cavc::intrLineSeg2LineSeg2(u1, u2, v1, v2);
+  auto result = cavccpp::intrLineSeg2LineSeg2(u1, u2, v1, v2);
   EXPECT_EQ(result.intrType, LineSeg2LineSeg2IntrType::None);
 }
 

@@ -6,7 +6,7 @@
 #include <unordered_map>
 #include <vector>
 
-namespace cavc {
+namespace cavccpp {
 template <typename Real> struct OffsetLoop {
   std::size_t parentLoopIndex;
   Polyline<Real> polyline;
@@ -415,6 +415,6 @@ OffsetLoopSet<Real> ParallelOffsetIslands<Real>::compute(const OffsetLoopSet<Rea
   return result;
 }
 
-} // namespace cavc
+} // namespace cavccpp
 
 #endif // CAVC_POLYLINEOFFSETISLANDS_HPP

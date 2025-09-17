@@ -15,9 +15,9 @@
   }
 
 struct cavc_pline {
-  cavc::Polyline<cavc_real> data;
+  cavccpp::Polyline<cavc_real> data;
   cavc_pline() = default;
-  cavc_pline(cavc::Polyline<cavc_real> &&p_data) noexcept : data(std::move(p_data)) {}
+  cavc_pline(cavccpp::Polyline<cavc_real> &&p_data) noexcept : data(std::move(p_data)) {}
 };
 
 struct cavc_pline_list {
@@ -25,7 +25,8 @@ struct cavc_pline_list {
 };
 
 // helper to move vector of plines to cavc_pline_list
-static void move_to_list(std::vector<cavc::Polyline<cavc_real>> &&plines, cavc_pline_list *list) {
+static void move_to_list(std::vector<cavccpp::Polyline<cavc_real>> &&plines,
+                         cavc_pline_list *list) {
   list->data.reserve(plines.size());
 
   for (std::size_t i = 0; i < plines.size(); ++i) {
@@ -193,7 +194,7 @@ void cavc_parallel_offset(cavc_pline const *pline, cavc_real delta, cavc_pline_l
   CAVC_ASSERT(output, "null output not allowed");
   CAVC_BEGIN_TRY_CATCH
   bool mayHaveSelfIntersects = (option_flags & 0x1) != 0;
-  auto results = cavc::parallelOffset(pline->data, delta, mayHaveSelfIntersects);
+  auto results = cavccpp::parallelOffset(pline->data, delta, mayHaveSelfIntersects);
   *output = new cavc_pline_list();
   move_to_list(std::move(results), *output);
   CAVC_END_TRY_CATCH
@@ -205,25 +206,25 @@ void cavc_combine_plines(cavc_pline const *pline_a, cavc_pline const *pline_b, i
   CAVC_ASSERT(pline_b, "null pline_b not allowed");
   CAVC_ASSERT(combine_mode >= 0 && combine_mode <= 3, "combine_mode must be 0, 1, 2, or 3");
   CAVC_BEGIN_TRY_CATCH
-  cavc::PlineCombineMode mode;
+  cavccpp::PlineCombineMode mode;
   switch (combine_mode) {
   case 0:
-    mode = cavc::PlineCombineMode::Union;
+    mode = cavccpp::PlineCombineMode::Union;
     break;
   case 1:
-    mode = cavc::PlineCombineMode::Exclude;
+    mode = cavccpp::PlineCombineMode::Exclude;
     break;
   case 2:
-    mode = cavc::PlineCombineMode::Intersect;
+    mode = cavccpp::PlineCombineMode::Intersect;
     break;
   case 3:
-    mode = cavc::PlineCombineMode::XOR;
+    mode = cavccpp::PlineCombineMode::XOR;
     break;
   default:
-    mode = cavc::PlineCombineMode::Union;
+    mode = cavccpp::PlineCombineMode::Union;
     break;
   }
-  auto results = cavc::combinePolylines(pline_a->data, pline_b->data, mode);
+  auto results = cavccpp::combinePolylines(pline_a->data, pline_b->data, mode);
 
   *remaining = new cavc_pline_list();
   *subtracted = new cavc_pline_list();
@@ -235,21 +236,21 @@ void cavc_combine_plines(cavc_pline const *pline_a, cavc_pline const *pline_b, i
 cavc_real cavc_get_path_length(cavc_pline const *pline) {
   CAVC_ASSERT(pline, "null pline not allowed");
   CAVC_BEGIN_TRY_CATCH
-  return cavc::getPathLength(pline->data);
+  return cavccpp::getPathLength(pline->data);
   CAVC_END_TRY_CATCH
 }
 
 cavc_real cavc_get_area(cavc_pline const *pline) {
   CAVC_ASSERT(pline, "null pline not allowed");
   CAVC_BEGIN_TRY_CATCH
-  return cavc::getArea(pline->data);
+  return cavccpp::getArea(pline->data);
   CAVC_END_TRY_CATCH
 }
 
 int cavc_get_winding_number(cavc_pline const *pline, cavc_point point) {
   CAVC_ASSERT(pline, "null pline not allowed");
   CAVC_BEGIN_TRY_CATCH
-  return cavc::getWindingNumber(pline->data, cavc::Vector2<cavc_real>(point.x, point.y));
+  return cavccpp::getWindingNumber(pline->data, cavccpp::Vector2<cavc_real>(point.x, point.y));
   CAVC_END_TRY_CATCH
 }
 
@@ -257,7 +258,7 @@ void cavc_get_extents(cavc_pline const *pline, cavc_real *min_x, cavc_real *min_
                       cavc_real *max_y) {
   CAVC_ASSERT(pline, "null pline not allowed");
   CAVC_BEGIN_TRY_CATCH
-  auto result = cavc::getExtents(pline->data);
+  auto result = cavccpp::getExtents(pline->data);
   *min_x = result.xMin;
   *min_y = result.yMin;
   *max_x = result.xMax;
@@ -271,8 +272,8 @@ void cavc_get_closest_point(cavc_pline const *pline, cavc_point input_point,
   CAVC_ASSERT(pline, "null pline not allowed");
   CAVC_ASSERT(pline->data.size() != 0, "empty pline not allowed");
   CAVC_BEGIN_TRY_CATCH
-  cavc::ClosestPoint<cavc_real> closestPoint(
-      pline->data, cavc::Vector2<cavc_real>(input_point.x, input_point.y));
+  cavccpp::ClosestPoint<cavc_real> closestPoint(
+      pline->data, cavccpp::Vector2<cavc_real>(input_point.x, input_point.y));
   *closest_start_index = static_cast<uint32_t>(closestPoint.index());
   *closest_point = cavc_point{closestPoint.point().x(), closestPoint.point().y()};
   *distance = closestPoint.distance();

@@ -9,7 +9,7 @@
 // This header has the polyline vertex definition and functions that work with polyline segments
 // defined by two polyline vertexes (e.g. intersects, arc information, splitting, etc.)
 
-namespace cavc {
+namespace cavccpp {
 template <typename Real> class PlineVertex {
 public:
   PlineVertex() = default;
@@ -503,5 +503,5 @@ IntrPlineSegsResult<Real> intrPlineSegs(PlineVertex<Real> const &v1, PlineVertex
   return result;
 }
 
-} // namespace cavc
+} // namespace cavccpp
 #endif // CAVC_PLINESEGMENT_HPP

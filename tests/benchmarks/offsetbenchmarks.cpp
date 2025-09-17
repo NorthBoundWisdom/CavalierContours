@@ -7,8 +7,8 @@ const double arcError = 0.01;
 static void offset(NoSetup, TestProfile const &profile) {
   for (std::size_t i = 1; i <= profile.offsetCount; ++i) {
     double offset = i * profile.offsetDelta;
-    cavc::parallelOffset(profile.pline, offset);
-    cavc::parallelOffset(profile.pline, -offset);
+    cavccpp::parallelOffset(profile.pline, offset);
+    cavccpp::parallelOffset(profile.pline, -offset);
   }
 }
 

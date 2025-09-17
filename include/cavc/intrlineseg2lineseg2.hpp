@@ -3,7 +3,7 @@
 #include "vector2.hpp"
 #include <algorithm>
 
-namespace cavc {
+namespace cavccpp {
 enum class LineSeg2LineSeg2IntrType {
   // no intersect (segments are parallel and not collinear)
   None,
@@ -148,5 +148,5 @@ intrLineSeg2LineSeg2(Vector2<Real> const &u1, Vector2<Real> const &u2, Vector2<R
 
   return result;
 }
-} // namespace cavc
+} // namespace cavccpp
 #endif // CAVC_INTRLINESEG2LINESEG2_HPP

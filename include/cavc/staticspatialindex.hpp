@@ -7,7 +7,7 @@
 #include <memory>
 #include <vector>
 
-namespace cavc {
+namespace cavccpp {
 template <typename Real, std::size_t NodeSize = 16> class StaticSpatialIndex {
 public:
   StaticSpatialIndex(std::size_t numItems) {
@@ -414,6 +414,6 @@ private:
     indices[j] = e;
   }
 };
-} // namespace cavc
+} // namespace cavccpp
 
 #endif // CAVC_STATICSPATIALINDEX_HPP

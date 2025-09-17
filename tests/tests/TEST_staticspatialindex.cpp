@@ -35,8 +35,8 @@ std::vector<double> createTestData() {
 
 static std::vector<double> testData = createTestData();
 
-cavc::StaticSpatialIndex<double, 16> createIndex() {
-  cavc::StaticSpatialIndex<double, 16> index(testData.size() / 4);
+cavccpp::StaticSpatialIndex<double, 16> createIndex() {
+  cavccpp::StaticSpatialIndex<double, 16> index(testData.size() / 4);
   for (std::size_t i = 0; i < testData.size(); i += 4) {
     index.add(testData[i], testData[i + 1], testData[i + 2], testData[i + 3]);
   }
@@ -44,9 +44,9 @@ cavc::StaticSpatialIndex<double, 16> createIndex() {
   return index;
 };
 
-static cavc::StaticSpatialIndex<double, 16> createSmallIndex() {
+static cavccpp::StaticSpatialIndex<double, 16> createSmallIndex() {
   std::size_t numItems = 14;
-  cavc::StaticSpatialIndex<double, 16> index(numItems);
+  cavccpp::StaticSpatialIndex<double, 16> index(numItems);
   for (std::size_t i = 0; i < 4 * numItems; i += 4) {
     index.add(testData[i], testData[i + 1], testData[i + 2], testData[i + 3]);
   }

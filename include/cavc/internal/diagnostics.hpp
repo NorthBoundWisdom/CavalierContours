@@ -5,10 +5,10 @@
 #include <sstream>
 #include <string>
 
-namespace cavc {
+namespace cavccpp {
 namespace internal {
 template <typename Real>
-std::string printVertexesToInitializerList(::cavc::Polyline<Real> const &pline) {
+std::string printVertexesToInitializerList(::cavccpp::Polyline<Real> const &pline) {
   std::stringstream ss;
   ss << std::setprecision(14) << "{ ";
   for (auto const &v : pline.vertexes()) {
@@ -22,7 +22,8 @@ std::string printVertexesToInitializerList(::cavc::Polyline<Real> const &pline) 
   return result;
 }
 
-template <typename Real> std::string propertiesFromPolyline(::cavc::Polyline<Real> const &pline) {
+template <typename Real>
+std::string propertiesFromPolyline(::cavccpp::Polyline<Real> const &pline) {
   auto area = getArea(pline);
   auto pathLength = getPathLength(pline);
   auto extents = getExtents(pline);
@@ -33,5 +34,5 @@ template <typename Real> std::string propertiesFromPolyline(::cavc::Polyline<Rea
   return result;
 }
 } // namespace internal
-} // namespace cavc
+} // namespace cavccpp
 #endif // CAVC_INTERNAL_DIAGNOSTICS_HPP

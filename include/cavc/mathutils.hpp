@@ -4,7 +4,7 @@
 #include "internal/common.hpp"
 #include <cmath>
 
-namespace cavc {
+namespace cavccpp {
 namespace utils {
 // absolute threshold to be used for comparing reals generally
 template <typename Real> constexpr Real realThreshold() { return Real(1e-8); }
@@ -110,6 +110,6 @@ template <typename T> std::size_t prevWrappingIndex(std::size_t index, const T &
   return index - 1;
 }
 } // namespace utils
-} // namespace cavc
+} // namespace cavccpp
 
 #endif // CAVC_MATHUTILS_HPP

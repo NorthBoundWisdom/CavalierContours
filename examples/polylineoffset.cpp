@@ -4,7 +4,7 @@ int main(int argc, char *argv[]) {
   (void)argc;
   (void)argv;
   // input polyline
-  cavc::Polyline<double> input;
+  cavccpp::Polyline<double> input;
   // add vertexes as (x, y, bulge)
   input.addVertex(0, 25, 1);
   input.addVertex(0, 0, 0);
@@ -20,5 +20,5 @@ int main(int argc, char *argv[]) {
   input.isClosed() = true;
 
   // compute the resulting offset polylines, offset = 3
-  std::vector<cavc::Polyline<double>> results = cavc::parallelOffset(input, 3.0);
+  std::vector<cavccpp::Polyline<double>> results = cavccpp::parallelOffset(input, 3.0);
 }

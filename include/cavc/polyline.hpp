@@ -10,7 +10,7 @@
 // This header has the polyline definition and common computation functions that work with polylines
 // (e.g. path length, area, extents, etc.)
 
-namespace cavc {
+namespace cavccpp {
 template <typename Real> class Polyline {
 public:
   /// Construct an empty open polyline.
@@ -284,7 +284,7 @@ private:
 /// by the arc (all end points lie on the arc path).
 template <typename Real>
 Polyline<Real> convertArcsToLines(Polyline<Real> const &pline, Real error) {
-  cavc::Polyline<Real> result;
+  cavccpp::Polyline<Real> result;
   result.isClosed() = pline.isClosed();
   // Handle empty polyline
   if (pline.size() == 0) {
@@ -305,7 +305,7 @@ Polyline<Real> convertArcsToLines(Polyline<Real> const &pline, Real error) {
 
       auto startAngle = angle(arc.center, v1.pos());
       auto endAngle = angle(arc.center, v2.pos());
-      Real deltaAngle = std::abs(cavc::utils::deltaAngle(startAngle, endAngle));
+      Real deltaAngle = std::abs(cavccpp::utils::deltaAngle(startAngle, endAngle));
 
       error = std::abs(error);
       Real segmentSubAngle = std::abs(Real(2) * std::acos(Real(1) - error / arc.radius));
@@ -579,6 +579,6 @@ void addOrReplaceIfSamePos(Polyline<Real> &pline, PlineVertex<Real> const &verte
 }
 } // namespace internal
 
-} // namespace cavc
+} // namespace cavccpp
 
 #endif // CAVC_POLYLINE_HPP

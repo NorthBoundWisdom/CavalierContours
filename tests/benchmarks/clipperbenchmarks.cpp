@@ -7,9 +7,9 @@ const double clipperScaleFactor = 1e8;
 const double unscaledArcError = 0.01;
 const double clipperRoundPrecision = clipperScaleFactor * unscaledArcError;
 
-static ClipperLib::Path polylineToClipperPath(const cavc::Polyline<double> &pline,
+static ClipperLib::Path polylineToClipperPath(const cavccpp::Polyline<double> &pline,
                                               double unscaledArcError) {
-  auto noArcsPline = cavc::convertArcsToLines(pline, unscaledArcError);
+  auto noArcsPline = cavccpp::convertArcsToLines(pline, unscaledArcError);
 
   ClipperLib::Path clipperPath;
   clipperPath.reserve(noArcsPline.size());

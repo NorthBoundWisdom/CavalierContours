@@ -3,9 +3,9 @@
 #include <benchmark/benchmark.h>
 
 struct WindingNumberSetup {
-  std::vector<cavc::Vector2<double>> testPts;
+  std::vector<cavccpp::Vector2<double>> testPts;
   WindingNumberSetup(TestProfile const &profile) {
-    auto extents = cavc::getExtents(profile.pline);
+    auto extents = cavccpp::getExtents(profile.pline);
     // expand out all directions by half the polyline width for some of the test points to for sure
     // be outside the polyline
     extents.expand((extents.xMax - extents.xMin) / 2.0);
@@ -28,7 +28,7 @@ struct WindingNumberSetup {
 
 static void windingNumber(WindingNumberSetup const &setup, TestProfile const &profile) {
   for (auto const &pt : setup.testPts) {
-    cavc::getWindingNumber(profile.pline, pt);
+    cavccpp::getWindingNumber(profile.pline, pt);
   }
 }
 

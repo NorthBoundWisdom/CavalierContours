@@ -4,8 +4,8 @@
 struct TestProfile {
   std::size_t offsetCount;
   double offsetDelta;
-  cavc::Polyline<double> pline;
-  TestProfile(std::size_t offsetCount, double offsetDelta, cavc::Polyline<double> pline)
+  cavccpp::Polyline<double> pline;
+  TestProfile(std::size_t offsetCount, double offsetDelta, cavccpp::Polyline<double> pline)
       : offsetCount(offsetCount), offsetDelta(offsetDelta), pline(pline) {}
 };
 
@@ -14,7 +14,7 @@ inline TestProfile square() {
   auto centerY = 5.0;
   auto width = 40.0;
   auto height = 40.0;
-  cavc::Polyline<double> pline;
+  cavccpp::Polyline<double> pline;
   pline.isClosed() = true;
   pline.addVertex(centerX - width / 2, centerY - height / 2, 0);
   pline.addVertex(centerX + width / 2, centerY - height / 2, 0);
@@ -29,7 +29,7 @@ inline TestProfile diamond() {
   auto centerY = 5.0;
   auto width = 40.0;
   auto height = 40.0;
-  cavc::Polyline<double> pline;
+  cavccpp::Polyline<double> pline;
   pline.isClosed() = true;
   pline.addVertex(centerX - width / 2, centerY, 0);
   pline.addVertex(centerX, centerY - height / 2, 0);
@@ -43,13 +43,13 @@ inline TestProfile circle(double arcsToLinesError = 0.0) {
   auto centerX = 5.0;
   auto centerY = 5.0;
   auto radius = 40.0;
-  cavc::Polyline<double> pline;
+  cavccpp::Polyline<double> pline;
   pline.isClosed() = true;
   pline.addVertex(centerX - radius, centerY, 1.0);
   pline.addVertex(centerX + radius, centerY, 1.0);
 
   if (arcsToLinesError != 0.0) {
-    pline = cavc::convertArcsToLines(pline, arcsToLinesError);
+    pline = cavccpp::convertArcsToLines(pline, arcsToLinesError);
   }
 
   return TestProfile(30, 1, std::move(pline));
@@ -64,9 +64,9 @@ inline TestProfile roundedRectangle(double arcsToLinesError = 0.0) {
   auto width = totalWidth - 2 * cornerRadius;
   auto height = totalHeight - 2 * cornerRadius;
   // 90 deg corner radii
-  auto bulge = std::tan(cavc::utils::pi<double>() / 8.0);
+  auto bulge = std::tan(cavccpp::utils::pi<double>() / 8.0);
 
-  cavc::Polyline<double> pline;
+  cavccpp::Polyline<double> pline;
   pline.isClosed() = true;
   // start YMin edge
   pline.addVertex(centerX - width / 2, centerY - totalHeight / 2, 0);
@@ -86,14 +86,14 @@ inline TestProfile roundedRectangle(double arcsToLinesError = 0.0) {
   pline.addVertex(centerX - totalWidth / 2, centerY - height / 2, bulge);
 
   if (arcsToLinesError != 0.0) {
-    pline = cavc::convertArcsToLines(pline, arcsToLinesError);
+    pline = cavccpp::convertArcsToLines(pline, arcsToLinesError);
   }
 
   return TestProfile(30, 0.5, std::move(pline));
 }
 
 inline TestProfile profile1(double arcsToLinesError = 0.0) {
-  cavc::Polyline<double> pline;
+  cavccpp::Polyline<double> pline;
   pline.isClosed() = true;
 
   pline.addVertex(0, 0, 0.0);
@@ -104,14 +104,14 @@ inline TestProfile profile1(double arcsToLinesError = 0.0) {
   pline.addVertex(0, 20, 0);
 
   if (arcsToLinesError != 0.0) {
-    pline = cavc::convertArcsToLines(pline, arcsToLinesError);
+    pline = cavccpp::convertArcsToLines(pline, arcsToLinesError);
   }
 
   return TestProfile(40, 0.1, std::move(pline));
 }
 
 inline TestProfile profile2(double arcsToLinesError = 0.0) {
-  cavc::Polyline<double> pline;
+  cavccpp::Polyline<double> pline;
   pline.addVertex(0, 25, 1);
   pline.addVertex(0, 0, 0);
   pline.addVertex(2, 0, 1);
@@ -126,7 +126,7 @@ inline TestProfile profile2(double arcsToLinesError = 0.0) {
   pline.isClosed() = true;
 
   if (arcsToLinesError != 0.0) {
-    pline = cavc::convertArcsToLines(pline, arcsToLinesError);
+    pline = cavccpp::convertArcsToLines(pline, arcsToLinesError);
   }
 
   return TestProfile(40, 0.1, std::move(pline));
@@ -136,17 +136,17 @@ inline TestProfile pathologicalProfile1(std::size_t segmentCount, double arcsToL
   auto radius = 40;
   auto centerX = 0;
   auto centerY = 0;
-  cavc::Polyline<double> pline;
+  cavccpp::Polyline<double> pline;
   pline.isClosed() = true;
 
   for (std::size_t i = 0; i < segmentCount; ++i) {
-    double angle = static_cast<double>(i) * cavc::utils::tau<double>() / segmentCount;
+    double angle = static_cast<double>(i) * cavccpp::utils::tau<double>() / segmentCount;
     pline.addVertex(radius * std::cos(angle) + centerX, radius * std::sin(angle) + centerY,
                     i % 2 == 0 ? 1 : -1);
   }
 
   if (arcsToLinesError != 0.0) {
-    pline = cavc::convertArcsToLines(pline, arcsToLinesError);
+    pline = cavccpp::convertArcsToLines(pline, arcsToLinesError);
   }
 
   return TestProfile(30, 1, std::move(pline));

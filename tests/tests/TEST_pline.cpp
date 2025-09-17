@@ -7,10 +7,10 @@
 
 #include "casebuilder.hpp"
 
-using Polyline = cavc::Polyline<double>;
-using PlineVertex = cavc::PlineVertex<double>;
-using Vector2 = cavc::Vector2<double>;
-using AABB = cavc::AABB<double>;
+using Polyline = cavccpp::Polyline<double>;
+using PlineVertex = cavccpp::PlineVertex<double>;
+using Vector2 = cavccpp::Vector2<double>;
+using AABB = cavccpp::AABB<double>;
 
 namespace {
 
@@ -140,7 +140,7 @@ TEST(polyline, figure_eight_case) {
 
 TEST(polyline, get_extents_empty_polyline) {
   Polyline pline;
-  AABB extents = cavc::getExtents(pline);
+  AABB extents = cavccpp::getExtents(pline);
 
   EXPECT_TRUE(std::isinf(extents.xMin) && extents.xMin > 0);
   EXPECT_TRUE(std::isinf(extents.yMin) && extents.yMin > 0);
@@ -151,7 +151,7 @@ TEST(polyline, get_extents_empty_polyline) {
 TEST(polyline, get_extents_single_vertex) {
   Polyline pline;
   pline.addVertex(2.0, 3.0, 0.0);
-  AABB extents = cavc::getExtents(pline);
+  AABB extents = cavccpp::getExtents(pline);
 
   EXPECT_TRUE(approxEqual(extents.xMin, 2.0));
   EXPECT_TRUE(approxEqual(extents.yMin, 3.0));
@@ -162,7 +162,7 @@ TEST(polyline, get_extents_single_vertex) {
 TEST(polyline, get_extents_rectangle) {
   auto vertices = CaseBuilder::simpleRectangle();
   Polyline pline = createFromVertices(vertices);
-  AABB extents = cavc::getExtents(pline);
+  AABB extents = cavccpp::getExtents(pline);
 
   AABB expected{0.0, 0.0, 1.0, 1.0};
   EXPECT_TRUE(approxEqual(extents, expected));
@@ -171,7 +171,7 @@ TEST(polyline, get_extents_rectangle) {
 TEST(polyline, get_extents_with_arcs) {
   auto vertices = CaseBuilder::positiveCircle();
   Polyline pline = createFromVertices(vertices);
-  AABB extents = cavc::getExtents(pline);
+  AABB extents = cavccpp::getExtents(pline);
 
   // Circle from (0,0) to (10,0) with bulge 1 creates a full circle
   // The circle should extend beyond the original points
@@ -185,7 +185,7 @@ TEST(polyline, get_area_open_polyline) {
   auto vertices = CaseBuilder::simpleRectangle();
   Polyline pline = createFromVertices(vertices, false); // Open polyline
 
-  double area = cavc::getArea(pline);
+  double area = cavccpp::getArea(pline);
   EXPECT_TRUE(approxEqual(area, 0.0)); // Open polylines have zero area
 }
 
@@ -193,12 +193,12 @@ TEST(polyline, get_area_rectangle) {
   auto vertices = CaseBuilder::simpleRectangle();
   Polyline pline = createFromVertices(vertices);
 
-  double area = cavc::getArea(pline);
+  double area = cavccpp::getArea(pline);
   EXPECT_TRUE(approxEqual(area, 1.0)); // 1x1 rectangle
 
   auto reversed = CaseBuilder::reverseDirection(vertices);
   Polyline reversedPline = createFromVertices(reversed);
-  double reversedArea = cavc::getArea(reversedPline);
+  double reversedArea = cavccpp::getArea(reversedPline);
   EXPECT_TRUE(approxEqual(reversedArea, -1.0)); // 1x1 rectangle
 }
 
@@ -206,25 +206,25 @@ TEST(polyline, get_area_two_half_circle) {
   auto vertices = CaseBuilder::positiveCircle();
   Polyline pline = createFromVertices(vertices);
 
-  double area = cavc::getArea(pline);
-  EXPECT_TRUE(approxEqual(area, cavc::utils::pi<double>() * 25.0));
+  double area = cavccpp::getArea(pline);
+  EXPECT_TRUE(approxEqual(area, cavccpp::utils::pi<double>() * 25.0));
 
   auto reversed = CaseBuilder::reverseDirection(vertices);
   Polyline reversedPline = createFromVertices(reversed);
-  double reversedArea = cavc::getArea(reversedPline);
-  EXPECT_TRUE(approxEqual(reversedArea, -cavc::utils::pi<double>() * 25.0));
+  double reversedArea = cavccpp::getArea(reversedPline);
+  EXPECT_TRUE(approxEqual(reversedArea, -cavccpp::utils::pi<double>() * 25.0));
 }
 
 TEST(polyline, get_path_length_empty) {
   Polyline pline;
-  double length = cavc::getPathLength(pline);
+  double length = cavccpp::getPathLength(pline);
   EXPECT_TRUE(approxEqual(length, 0.0));
 }
 
 TEST(polyline, get_path_length_single_vertex) {
   Polyline pline;
   pline.addVertex(0.0, 0.0, 0.0);
-  double length = cavc::getPathLength(pline);
+  double length = cavccpp::getPathLength(pline);
   EXPECT_TRUE(approxEqual(length, 0.0));
 }
 
@@ -234,7 +234,7 @@ TEST(polyline, get_path_length_line_segments) {
   pline.addVertex(3.0, 0.0, 0.0);
   pline.addVertex(3.0, 4.0, 0.0);
 
-  double length = cavc::getPathLength(pline);
+  double length = cavccpp::getPathLength(pline);
   EXPECT_TRUE(approxEqual(length, 7.0)); // 3 + 4
 }
 
@@ -242,9 +242,9 @@ TEST(polyline, get_path_length_with_arc) {
   auto vertices = CaseBuilder::quarterArcCase();
   Polyline pline = createFromVertices(vertices, false);
 
-  double length = cavc::getPathLength(pline);
+  double length = cavccpp::getPathLength(pline);
   // Quarter arc with radius 1 should have length π/2
-  EXPECT_TRUE(approxEqual(length, cavc::utils::pi<double>() / 2.0, 1e-6));
+  EXPECT_TRUE(approxEqual(length, cavccpp::utils::pi<double>() / 2.0, 1e-6));
 }
 
 // Winding Number Tests
@@ -253,7 +253,7 @@ TEST(polyline, get_winding_number_open_polyline) {
   auto vertices = CaseBuilder::simpleRectangle();
   Polyline pline = createFromVertices(vertices, false);
 
-  int winding = cavc::getWindingNumber(pline, Vector2{0.5, 0.5});
+  int winding = cavccpp::getWindingNumber(pline, Vector2{0.5, 0.5});
   EXPECT_EQ(winding, 0); // Open polylines always return 0
 }
 
@@ -261,7 +261,7 @@ TEST(polyline, get_winding_number_point_inside_rectangle) {
   auto vertices = CaseBuilder::simpleRectangle();
   Polyline pline = createFromVertices(vertices);
 
-  int winding = cavc::getWindingNumber(pline, Vector2{0.5, 0.5});
+  int winding = cavccpp::getWindingNumber(pline, Vector2{0.5, 0.5});
   EXPECT_EQ(std::abs(winding), 1); // Point inside should have non-zero winding
 }
 
@@ -269,7 +269,7 @@ TEST(polyline, get_winding_number_point_outside_rectangle) {
   auto vertices = CaseBuilder::simpleRectangle();
   Polyline pline = createFromVertices(vertices);
 
-  int winding = cavc::getWindingNumber(pline, Vector2{2.0, 2.0});
+  int winding = cavccpp::getWindingNumber(pline, Vector2{2.0, 2.0});
   EXPECT_EQ(winding, 0); // Point outside should have zero winding
 }
 
@@ -278,11 +278,11 @@ TEST(polyline, get_winding_number_circle) {
   Polyline pline = createFromVertices(vertices);
 
   // Point inside circle
-  int windingInside = cavc::getWindingNumber(pline, Vector2{5.0, 0.0});
+  int windingInside = cavccpp::getWindingNumber(pline, Vector2{5.0, 0.0});
   EXPECT_EQ(std::abs(windingInside), 1);
 
   // Point outside circle
-  int windingOutside = cavc::getWindingNumber(pline, Vector2{20.0, 0.0});
+  int windingOutside = cavccpp::getWindingNumber(pline, Vector2{20.0, 0.0});
   EXPECT_EQ(windingOutside, 0);
 }
 
@@ -292,7 +292,7 @@ TEST(polyline, closest_point_single_vertex) {
   Polyline pline;
   pline.addVertex(1.0, 2.0, 0.0);
 
-  cavc::ClosestPoint<double> cp(pline, Vector2{3.0, 4.0});
+  cavccpp::ClosestPoint<double> cp(pline, Vector2{3.0, 4.0});
   EXPECT_EQ(cp.index(), 0);
   EXPECT_TRUE(approxEqual(cp.point(), Vector2{1.0, 2.0}));
   EXPECT_TRUE(approxEqual(cp.distance(), std::sqrt(8.0))); // Distance from (3,4) to (1,2)
@@ -303,7 +303,7 @@ TEST(polyline, closest_point_line_segment) {
   pline.addVertex(0.0, 0.0, 0.0);
   pline.addVertex(2.0, 0.0, 0.0);
 
-  cavc::ClosestPoint<double> cp(pline, Vector2{1.0, 1.0});
+  cavccpp::ClosestPoint<double> cp(pline, Vector2{1.0, 1.0});
   EXPECT_EQ(cp.index(), 0);
   EXPECT_TRUE(approxEqual(cp.point(), Vector2{1.0, 0.0})); // Closest point on segment
   EXPECT_TRUE(approxEqual(cp.distance(), 1.0));
@@ -315,7 +315,7 @@ TEST(polyline, closest_point_to_vertex) {
   pline.addVertex(2.0, 0.0, 0.0);
   pline.addVertex(2.0, 2.0, 0.0);
 
-  cavc::ClosestPoint<double> cp(pline, Vector2{2.0, 0.0});
+  cavccpp::ClosestPoint<double> cp(pline, Vector2{2.0, 0.0});
   EXPECT_TRUE(approxEqual(cp.point(), Vector2{2.0, 0.0}));
   EXPECT_TRUE(approxEqual(cp.distance(), 0.0));
 }
@@ -326,7 +326,7 @@ TEST(polyline, scale_polyline) {
   auto vertices = CaseBuilder::simpleRectangle();
   Polyline pline = createFromVertices(vertices);
 
-  cavc::scalePolyline(pline, 2.0);
+  cavccpp::scalePolyline(pline, 2.0);
 
   EXPECT_TRUE(approxEqual(pline[0].pos(), Vector2{0.0, 0.0}));
   EXPECT_TRUE(approxEqual(pline[1].pos(), Vector2{2.0, 0.0}));
@@ -344,7 +344,7 @@ TEST(polyline, translate_polyline) {
   Polyline pline = createFromVertices(vertices);
 
   Vector2 offset{3.0, 4.0};
-  cavc::translatePolyline(pline, offset);
+  cavccpp::translatePolyline(pline, offset);
 
   EXPECT_TRUE(approxEqual(pline[0].pos(), Vector2{3.0, 4.0}));
   EXPECT_TRUE(approxEqual(pline[1].pos(), Vector2{4.0, 4.0}));
@@ -360,7 +360,7 @@ TEST(polyline, invert_direction) {
   pline.addVertex(1.0, 0.0, -0.3);
   pline.addVertex(1.0, 1.0, 0.0);
 
-  cavc::invertDirection(pline);
+  cavccpp::invertDirection(pline);
 
   // Vertices should be reversed
   EXPECT_TRUE(approxEqual(pline[0].pos(), Vector2{1.0, 1.0}));
@@ -381,7 +381,7 @@ TEST(polyline, prune_singularities) {
   pline.addVertex(1.0, 1.0, 0.0);
   pline.addVertex(1.0, 1.0, 0.3); // Another duplicate
 
-  Polyline pruned = cavc::pruneSingularities(pline, 1e-9);
+  Polyline pruned = cavccpp::pruneSingularities(pline, 1e-9);
 
   EXPECT_EQ(pruned.size(), 3);
   EXPECT_TRUE(approxEqual(pruned[0].pos(), Vector2{0.0, 0.0}));
@@ -399,7 +399,7 @@ TEST(polyline, prune_singularities_closed_polyline) {
   pline.addVertex(1.0, 1.0, 0.0);
   pline.addVertex(0.0, 0.0, 0.5); // Last vertex same as first
 
-  Polyline pruned = cavc::pruneSingularities(pline, 1e-9);
+  Polyline pruned = cavccpp::pruneSingularities(pline, 1e-9);
 
   EXPECT_EQ(pruned.size(), 3); // Should remove duplicate last vertex
   EXPECT_TRUE(pruned.isClosed());
@@ -411,7 +411,7 @@ TEST(polyline, convert_arcs_to_lines_no_arcs) {
   auto vertices = CaseBuilder::simpleRectangle();
   Polyline pline = createFromVertices(vertices);
 
-  Polyline converted = cavc::convertArcsToLines(pline, 0.1);
+  Polyline converted = cavccpp::convertArcsToLines(pline, 0.1);
 
   EXPECT_EQ(converted.isClosed(), pline.isClosed());
 
@@ -428,7 +428,7 @@ TEST(polyline, convert_arcs_to_lines_with_arc) {
   auto vertices = CaseBuilder::quarterArcCase();
   Polyline pline = createFromVertices(vertices, false);
 
-  Polyline converted = cavc::convertArcsToLines(pline, 0.01);
+  Polyline converted = cavccpp::convertArcsToLines(pline, 0.01);
 
   // Should have more vertices than original due to arc tessellation
   EXPECT_GT(converted.size(), pline.size());
@@ -450,7 +450,7 @@ TEST(polyline, create_spatial_index) {
   auto vertices = CaseBuilder::simpleRectangle();
   Polyline pline = createFromVertices(vertices);
 
-  auto spatialIndex = cavc::createApproxSpatialIndex(pline);
+  auto spatialIndex = cavccpp::createApproxSpatialIndex(pline);
 
   // Just test that it doesn't crash and creates something
   // Check that we can query the spatial index
@@ -517,35 +517,35 @@ TEST(polyline, empty_polyline_basic_operations) {
   Polyline pline;
 
   // Basic query operations should not crash
-  EXPECT_NO_THROW(cavc::getExtents(pline));
-  EXPECT_NO_THROW(cavc::getArea(pline));
-  EXPECT_NO_THROW(cavc::getPathLength(pline));
-  EXPECT_NO_THROW(cavc::getWindingNumber(pline, Vector2{0.0, 0.0}));
+  EXPECT_NO_THROW(cavccpp::getExtents(pline));
+  EXPECT_NO_THROW(cavccpp::getArea(pline));
+  EXPECT_NO_THROW(cavccpp::getPathLength(pline));
+  EXPECT_NO_THROW(cavccpp::getWindingNumber(pline, Vector2{0.0, 0.0}));
 }
 
 TEST(polyline, empty_polyline_transformation_operations) {
   Polyline pline;
 
   // Transformation operations should not crash
-  EXPECT_NO_THROW(cavc::scalePolyline(pline, 2.0));
-  EXPECT_NO_THROW(cavc::translatePolyline(pline, Vector2{1.0, 1.0}));
+  EXPECT_NO_THROW(cavccpp::scalePolyline(pline, 2.0));
+  EXPECT_NO_THROW(cavccpp::translatePolyline(pline, Vector2{1.0, 1.0}));
 }
 
 TEST(polyline, empty_polyline_invert_direction) {
   Polyline pline;
-  EXPECT_NO_THROW(cavc::invertDirection(pline));
+  EXPECT_NO_THROW(cavccpp::invertDirection(pline));
 }
 
 TEST(polyline, empty_polyline_prune_singularities) {
   Polyline pline;
-  EXPECT_NO_THROW(cavc::pruneSingularities(pline, 1e-9));
+  EXPECT_NO_THROW(cavccpp::pruneSingularities(pline, 1e-9));
 }
 
 TEST(polyline, empty_polyline_convert_arcs_fixed) {
   Polyline pline;
-  EXPECT_NO_THROW(cavc::convertArcsToLines(pline, 0.1));
+  EXPECT_NO_THROW(cavccpp::convertArcsToLines(pline, 0.1));
 
-  Polyline converted = cavc::convertArcsToLines(pline, 0.1);
+  Polyline converted = cavccpp::convertArcsToLines(pline, 0.1);
   EXPECT_EQ(converted.size(), 0);
   EXPECT_EQ(converted.isClosed(), pline.isClosed());
 }
@@ -555,10 +555,10 @@ TEST(polyline, single_vertex_operations) {
   pline.addVertex(1.0, 2.0, 0.5);
 
   // These should work with single vertex
-  EXPECT_NO_THROW(cavc::getExtents(pline));
-  EXPECT_TRUE(approxEqual(cavc::getArea(pline), 0.0));
-  EXPECT_TRUE(approxEqual(cavc::getPathLength(pline), 0.0));
-  EXPECT_EQ(cavc::getWindingNumber(pline, Vector2{0.0, 0.0}), 0);
+  EXPECT_NO_THROW(cavccpp::getExtents(pline));
+  EXPECT_TRUE(approxEqual(cavccpp::getArea(pline), 0.0));
+  EXPECT_TRUE(approxEqual(cavccpp::getPathLength(pline), 0.0));
+  EXPECT_EQ(cavccpp::getWindingNumber(pline, Vector2{0.0, 0.0}), 0);
 }
 
 TEST(polyline, large_coordinates) {
@@ -569,10 +569,10 @@ TEST(polyline, large_coordinates) {
   pline.addVertex(1e6, 1e6 + 1, 0.0);
   pline.isClosed() = true;
 
-  double area = cavc::getArea(pline);
+  double area = cavccpp::getArea(pline);
   EXPECT_TRUE(approxEqual(area, 1.0, 1e-10));
 
-  double length = cavc::getPathLength(pline);
+  double length = cavccpp::getPathLength(pline);
   EXPECT_TRUE(approxEqual(length, 4.0, 1e-10));
 }
 
@@ -584,10 +584,10 @@ TEST(polyline, very_small_coordinates) {
   pline.addVertex(1e-6, 2e-6, 0.0);
   pline.isClosed() = true;
 
-  double area = cavc::getArea(pline);
+  double area = cavccpp::getArea(pline);
   EXPECT_TRUE(approxEqual(area, 1e-12, 1e-15));
 
-  double length = cavc::getPathLength(pline);
+  double length = cavccpp::getPathLength(pline);
   EXPECT_TRUE(approxEqual(length, 4e-6, 1e-12));
 }
 

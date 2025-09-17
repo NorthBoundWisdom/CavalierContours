@@ -4,7 +4,7 @@
 #include <cavc/plinesegment.hpp>
 #include <vector>
 
-using PlineVertex = cavc::PlineVertex<double>;
+using PlineVertex = cavccpp::PlineVertex<double>;
 class CaseBuilder {
 public:
   static std::vector<PlineVertex> reverseDirection(std::vector<PlineVertex> const &vertices);

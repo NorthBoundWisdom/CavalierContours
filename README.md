@@ -44,7 +44,7 @@ C++14 header only library (with a C API available) for processing 2D polylines c
 #include "cavc/polylineoffset.hpp"
 
 // input polyline
-cavc::Polyline<double> input;
+cavccpp::Polyline<double> input;
 // add vertexes as (x, y, bulge)
 input.addVertex(0, 25, 1);
 input.addVertex(0, 0, 0);
@@ -60,7 +60,7 @@ input.addVertex(28, 12, 0);
 input.isClosed() = true;
 
 // compute the resulting offset polylines, offset = 3
-std::vector<cavc::Polyline<double>> results = cavc::parallelOffset(input, 3.0);
+std::vector<cavccpp::Polyline<double>> results = cavccpp::parallelOffset(input, 3.0);
 ```
 NOTE: If the offset results are wrong in some way you may need to adjust the scale of the numbers, e.g. scale the inputs up by 1000 (by multiplying all the X and Y components of the vertexes by 1000), perform the offset (with the offset value also scaled up by 1000), and then scale the output result back down by 1000. This is due the fixed bit representation of floating point numbers and the absolute float comparing and thresholding used by the algorithm.
 

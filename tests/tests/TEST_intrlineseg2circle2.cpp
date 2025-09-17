@@ -4,8 +4,8 @@
 #include <cavc/vector2.hpp>
 #include <gtest/gtest.h>
 
-using Vector2 = cavc::Vector2<double>;
-using IntrLineSeg2Circle2Result = cavc::IntrLineSeg2Circle2Result<double>;
+using Vector2 = cavccpp::Vector2<double>;
+using IntrLineSeg2Circle2Result = cavccpp::IntrLineSeg2Circle2Result<double>;
 
 namespace {
 
@@ -36,7 +36,7 @@ TEST(intrlineseg2circle2, no_intersection_segment_outside_circle) {
   double radius = 1.0;
   Vector2 center{0.0, 0.0};
 
-  auto result = cavc::intrLineSeg2Circle2(p0, p1, radius, center);
+  auto result = cavccpp::intrLineSeg2Circle2(p0, p1, radius, center);
   // The infinite line y=0 intersects the circle at x=±1, but t values will be negative
   EXPECT_EQ(result.numIntersects, 2);
   // Both intersections should be outside the segment (t < 0)
@@ -51,7 +51,7 @@ TEST(intrlineseg2circle2, no_intersection_segment_inside_circle) {
   double radius = 1.0;
   Vector2 center{0.0, 0.0};
 
-  auto result = cavc::intrLineSeg2Circle2(p0, p1, radius, center);
+  auto result = cavccpp::intrLineSeg2Circle2(p0, p1, radius, center);
   // The infinite line y=0 intersects the circle at x=±1
   EXPECT_EQ(result.numIntersects, 2);
   // One intersection before segment (t < 0) and one after (t > 1)
@@ -65,7 +65,7 @@ TEST(intrlineseg2circle2, one_intersection_tangent_horizontal) {
   double radius = 1.0;
   Vector2 center{0.0, 0.0};
 
-  auto result = cavc::intrLineSeg2Circle2(p0, p1, radius, center);
+  auto result = cavccpp::intrLineSeg2Circle2(p0, p1, radius, center);
   EXPECT_EQ(result.numIntersects, 1);
   EXPECT_TRUE(approxEqual(result.t0, 0.5)); // Tangent point at middle of segment
 
@@ -80,7 +80,7 @@ TEST(intrlineseg2circle2, one_intersection_tangent_vertical) {
   double radius = 1.0;
   Vector2 center{0.0, 0.0};
 
-  auto result = cavc::intrLineSeg2Circle2(p0, p1, radius, center);
+  auto result = cavccpp::intrLineSeg2Circle2(p0, p1, radius, center);
   EXPECT_EQ(result.numIntersects, 1);
   EXPECT_TRUE(approxEqual(result.t0, 0.5)); // Tangent point at middle of segment
 
@@ -95,7 +95,7 @@ TEST(intrlineseg2circle2, two_intersections_horizontal_through_center) {
   double radius = 1.0;
   Vector2 center{0.0, 0.0};
 
-  auto result = cavc::intrLineSeg2Circle2(p0, p1, radius, center);
+  auto result = cavccpp::intrLineSeg2Circle2(p0, p1, radius, center);
   EXPECT_EQ(result.numIntersects, 2);
 
   // Intersection points should be at t = 0.25 and t = 0.75 (at x = -1 and x = 1)
@@ -116,7 +116,7 @@ TEST(intrlineseg2circle2, two_intersections_vertical_through_center) {
   double radius = 1.0;
   Vector2 center{0.0, 0.0};
 
-  auto result = cavc::intrLineSeg2Circle2(p0, p1, radius, center);
+  auto result = cavccpp::intrLineSeg2Circle2(p0, p1, radius, center);
   EXPECT_EQ(result.numIntersects, 2);
 
   Vector2 intersection1 = getPointOnSegment(p0, p1, result.t0);
@@ -132,7 +132,7 @@ TEST(intrlineseg2circle2, two_intersections_diagonal) {
   double radius = 1.0;
   Vector2 center{0.0, 0.0};
 
-  auto result = cavc::intrLineSeg2Circle2(p0, p1, radius, center);
+  auto result = cavccpp::intrLineSeg2Circle2(p0, p1, radius, center);
   EXPECT_EQ(result.numIntersects, 2);
 
   Vector2 intersection1 = getPointOnSegment(p0, p1, result.t0);
@@ -148,7 +148,7 @@ TEST(intrlineseg2circle2, one_intersection_segment_starts_on_circle) {
   double radius = 1.0;
   Vector2 center{0.0, 0.0};
 
-  auto result = cavc::intrLineSeg2Circle2(p0, p1, radius, center);
+  auto result = cavccpp::intrLineSeg2Circle2(p0, p1, radius, center);
   // The infinite line intersects at x=±1, but we start at x=1
   EXPECT_EQ(result.numIntersects, 2);
   // One intersection at start (t=0) and one before the segment (t<0)
@@ -163,7 +163,7 @@ TEST(intrlineseg2circle2, one_intersection_segment_ends_on_circle) {
   double radius = 1.0;
   Vector2 center{0.0, 0.0};
 
-  auto result = cavc::intrLineSeg2Circle2(p0, p1, radius, center);
+  auto result = cavccpp::intrLineSeg2Circle2(p0, p1, radius, center);
   // The infinite line intersects at x=±1, we end at x=1
   EXPECT_EQ(result.numIntersects, 2);
   // One intersection at end (t=1) and one after the segment (t>1)
@@ -178,7 +178,7 @@ TEST(intrlineseg2circle2, two_intersections_segment_crosses_circle) {
   double radius = 1.0;
   Vector2 center{0.0, 0.0};
 
-  auto result = cavc::intrLineSeg2Circle2(p0, p1, radius, center);
+  auto result = cavccpp::intrLineSeg2Circle2(p0, p1, radius, center);
   EXPECT_EQ(result.numIntersects, 2);
 
   // Both t values should be between 0 and 1
@@ -198,7 +198,7 @@ TEST(intrlineseg2circle2, zero_length_segment_on_circle) {
   double radius = 1.0;
   Vector2 center{0.0, 0.0};
 
-  auto result = cavc::intrLineSeg2Circle2(p0, p1, radius, center);
+  auto result = cavccpp::intrLineSeg2Circle2(p0, p1, radius, center);
   EXPECT_EQ(result.numIntersects, 1);
   EXPECT_TRUE(approxEqual(result.t0, 0.0));
 }
@@ -210,7 +210,7 @@ TEST(intrlineseg2circle2, zero_length_segment_off_circle) {
   double radius = 1.0;
   Vector2 center{0.0, 0.0};
 
-  auto result = cavc::intrLineSeg2Circle2(p0, p1, radius, center);
+  auto result = cavccpp::intrLineSeg2Circle2(p0, p1, radius, center);
   EXPECT_EQ(result.numIntersects, 0);
 }
 
@@ -221,7 +221,7 @@ TEST(intrlineseg2circle2, segment_chord_of_circle) {
   double radius = 1.0;
   Vector2 center{0.0, 0.0};
 
-  auto result = cavc::intrLineSeg2Circle2(p0, p1, radius, center);
+  auto result = cavccpp::intrLineSeg2Circle2(p0, p1, radius, center);
   EXPECT_EQ(result.numIntersects, 2);
   EXPECT_TRUE(approxEqual(result.t0, 0.0) || approxEqual(result.t0, 1.0));
   EXPECT_TRUE(approxEqual(result.t1, 0.0) || approxEqual(result.t1, 1.0));
@@ -234,7 +234,7 @@ TEST(intrlineseg2circle2, circle_not_at_origin) {
   double radius = 1.0;
   Vector2 center{2.0, 1.0};
 
-  auto result = cavc::intrLineSeg2Circle2(p0, p1, radius, center);
+  auto result = cavccpp::intrLineSeg2Circle2(p0, p1, radius, center);
   EXPECT_EQ(result.numIntersects, 2);
 
   Vector2 intersection1 = getPointOnSegment(p0, p1, result.t0);
@@ -250,7 +250,7 @@ TEST(intrlineseg2circle2, large_circle_small_segment) {
   double radius = 100.0;
   Vector2 center{0.0, 0.0};
 
-  auto result = cavc::intrLineSeg2Circle2(p0, p1, radius, center);
+  auto result = cavccpp::intrLineSeg2Circle2(p0, p1, radius, center);
   EXPECT_EQ(result.numIntersects, 2);
 }
 
@@ -261,7 +261,7 @@ TEST(intrlineseg2circle2, very_small_circle) {
   double radius = 0.0005;
   Vector2 center{0.0, 0.0};
 
-  auto result = cavc::intrLineSeg2Circle2(p0, p1, radius, center);
+  auto result = cavccpp::intrLineSeg2Circle2(p0, p1, radius, center);
   // Should detect tangency or very close intersections
   EXPECT_TRUE(result.numIntersects == 1 || result.numIntersects == 2);
 }
@@ -273,7 +273,7 @@ TEST(intrlineseg2circle2, negative_coordinates) {
   double radius = 1.0;
   Vector2 center{-2.0, -1.0};
 
-  auto result = cavc::intrLineSeg2Circle2(p0, p1, radius, center);
+  auto result = cavccpp::intrLineSeg2Circle2(p0, p1, radius, center);
   EXPECT_EQ(result.numIntersects, 2);
 
   Vector2 intersection1 = getPointOnSegment(p0, p1, result.t0);
@@ -289,7 +289,7 @@ TEST(intrlineseg2circle2, extended_intersection_before_segment) {
   double radius = 1.0;
   Vector2 center{0.0, 0.0};
 
-  auto result = cavc::intrLineSeg2Circle2(p0, p1, radius, center);
+  auto result = cavccpp::intrLineSeg2Circle2(p0, p1, radius, center);
   EXPECT_EQ(result.numIntersects, 2);
 
   // Should have one intersection within segment (where it exits) and one before
@@ -306,7 +306,7 @@ TEST(intrlineseg2circle2, extended_intersection_after_segment) {
   double radius = 1.0;
   Vector2 center{0.0, 0.0};
 
-  auto result = cavc::intrLineSeg2Circle2(p0, p1, radius, center);
+  auto result = cavccpp::intrLineSeg2Circle2(p0, p1, radius, center);
   EXPECT_EQ(result.numIntersects, 2);
 
   // Should have one intersection within segment (where it enters) and one after
@@ -318,13 +318,13 @@ TEST(intrlineseg2circle2, extended_intersection_after_segment) {
 
 TEST(intrlineseg2circle2, precision_edge_case_near_tangent) {
   // Test near tangent condition with precision boundary
-  double y = 1.0 - cavc::utils::realThreshold<double>() / 2.0;
+  double y = 1.0 - cavccpp::utils::realThreshold<double>() / 2.0;
   Vector2 p0{-2.0, y};
   Vector2 p1{2.0, y};
   double radius = 1.0;
   Vector2 center{0.0, 0.0};
 
-  auto result = cavc::intrLineSeg2Circle2(p0, p1, radius, center);
+  auto result = cavccpp::intrLineSeg2Circle2(p0, p1, radius, center);
   // Should detect as either tangent (1 intersection) or very close intersections (2)
   EXPECT_TRUE(result.numIntersects == 1 || result.numIntersects == 2);
 }
@@ -336,7 +336,7 @@ TEST(intrlineseg2circle2, zero_radius_circle) {
   double radius = 0.0;
   Vector2 center{0.0, 0.0};
 
-  auto result = cavc::intrLineSeg2Circle2(p0, p1, radius, center);
+  auto result = cavccpp::intrLineSeg2Circle2(p0, p1, radius, center);
   EXPECT_EQ(result.numIntersects, 1);
   EXPECT_TRUE(approxEqual(result.t0, 0.5)); // Point at center of segment
 }
@@ -348,7 +348,7 @@ TEST(intrlineseg2circle2, line_misses_circle_entirely) {
   double radius = 1.0;
   Vector2 center{0.0, 0.0};
 
-  auto result = cavc::intrLineSeg2Circle2(p0, p1, radius, center);
+  auto result = cavccpp::intrLineSeg2Circle2(p0, p1, radius, center);
   EXPECT_EQ(result.numIntersects, 0);
 }
 
@@ -359,7 +359,7 @@ TEST(intrlineseg2circle2, segment_entirely_before_intersections) {
   double radius = 1.0;
   Vector2 center{0.0, 0.0};
 
-  auto result = cavc::intrLineSeg2Circle2(p0, p1, radius, center);
+  auto result = cavccpp::intrLineSeg2Circle2(p0, p1, radius, center);
   EXPECT_EQ(result.numIntersects, 2);
   // Both intersections should be after the segment (t > 1)
   EXPECT_TRUE(result.t0 > 1.0 && result.t1 > 1.0);
@@ -372,7 +372,7 @@ TEST(intrlineseg2circle2, segment_entirely_after_intersections) {
   double radius = 1.0;
   Vector2 center{0.0, 0.0};
 
-  auto result = cavc::intrLineSeg2Circle2(p0, p1, radius, center);
+  auto result = cavccpp::intrLineSeg2Circle2(p0, p1, radius, center);
   EXPECT_EQ(result.numIntersects, 2);
   // Both intersections should be before the segment (t < 0)
   EXPECT_TRUE(result.t0 < 0.0 && result.t1 < 0.0);
@@ -385,7 +385,7 @@ TEST(intrlineseg2circle2, verify_parametric_values_horizontal) {
   double radius = 2.0;
   Vector2 center{0.0, 0.0};
 
-  auto result = cavc::intrLineSeg2Circle2(p0, p1, radius, center);
+  auto result = cavccpp::intrLineSeg2Circle2(p0, p1, radius, center);
   EXPECT_EQ(result.numIntersects, 2);
 
   // Intersections at x = ±2, so t = (x - (-3))/6 = (x + 3)/6
@@ -405,7 +405,7 @@ TEST(intrlineseg2circle2, verify_parametric_values_vertical) {
   double radius = 2.0;
   Vector2 center{0.0, 0.0};
 
-  auto result = cavc::intrLineSeg2Circle2(p0, p1, radius, center);
+  auto result = cavccpp::intrLineSeg2Circle2(p0, p1, radius, center);
   EXPECT_EQ(result.numIntersects, 2);
 
   // Intersections at y = ±2, so t = (y - (-3))/6 = (y + 3)/6
@@ -425,7 +425,7 @@ TEST(intrlineseg2circle2, tangent_t_outside_segment) {
   double radius = 1.0;
   Vector2 center{0.0, 0.0};
 
-  auto result = cavc::intrLineSeg2Circle2(p0, p1, radius, center);
+  auto result = cavccpp::intrLineSeg2Circle2(p0, p1, radius, center);
   EXPECT_EQ(result.numIntersects, 1);
   // Tangent point at (0,1) should give t = (0-2)/(4-2) = -1
   EXPECT_TRUE(approxEqual(result.t0, -1.0));
@@ -438,7 +438,7 @@ TEST(intrlineseg2circle2, intersection_points_validation) {
   double radius = 1.0;
   Vector2 center{0.0, 0.0};
 
-  auto result = cavc::intrLineSeg2Circle2(p0, p1, radius, center);
+  auto result = cavccpp::intrLineSeg2Circle2(p0, p1, radius, center);
   EXPECT_EQ(result.numIntersects, 2);
 
   // Calculate actual intersection points and verify they're on the circle

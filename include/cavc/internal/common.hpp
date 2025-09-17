@@ -4,7 +4,7 @@
 #include <functional>
 #include <utility>
 
-namespace cavc {
+namespace cavccpp {
 namespace internal {
 #define CAVC_ASSERT(cond, msg) assert(cond &&msg)
 
@@ -23,6 +23,6 @@ struct IndexPairHash {
   }
 };
 } // namespace internal
-} // namespace cavc
+} // namespace cavccpp
 
 #endif // CAVC_INTERNAL_COMMON_HPP

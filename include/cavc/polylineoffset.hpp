@@ -8,7 +8,7 @@
 
 // This header has functions for offsetting polylines
 
-namespace cavc {
+namespace cavccpp {
 namespace internal {
 /// Represents a raw polyline offset segment.
 template <typename Real> struct PlineOffsetSegment {
@@ -1272,5 +1272,5 @@ std::vector<Polyline<Real>> parallelOffset(Polyline<Real> const &pline, Real off
   return stitchOffsetSlicesTogether(slices, pline.isClosed(), rawOffset.size() - 1);
 }
 
-} // namespace cavc
+} // namespace cavccpp
 #endif // CAVC_POLYLINEOFFSET_HPP

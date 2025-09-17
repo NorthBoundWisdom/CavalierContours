@@ -4,7 +4,7 @@
 #include <array>
 #include <cassert>
 
-namespace cavc {
+namespace cavccpp {
 template <typename Real, std::size_t N> class Vector {
 public:
   Vector() = default;
@@ -263,6 +263,6 @@ template <std::size_t N, typename Real> Real normalize(Vector<Real, N> &v) {
   v /= length;
   return length;
 }
-} // namespace cavc
+} // namespace cavccpp
 
 #endif // CAVC_VECTOR_HPP

@@ -2,7 +2,7 @@
 #define CAVC_INTRCIRCLE2CIRCLE2_HPP
 #include "vector2.hpp"
 
-namespace cavc {
+namespace cavccpp {
 enum class Circle2Circle2IntrType {
   // no intersect between circles
   NoIntersect,
@@ -75,6 +75,6 @@ IntrCircle2Circle2Result<Real> intrCircle2Circle2(Real radius1, Vector2<Real> co
 
   return result;
 }
-} // namespace cavc
+} // namespace cavccpp
 
 #endif // CAVC_INTRCIRCLE2CIRCLE2_HPP

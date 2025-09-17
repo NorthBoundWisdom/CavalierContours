@@ -4,9 +4,9 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
-using Vector2 = cavc::Vector2<double>;
-using IntrCircle2Circle2Result = cavc::IntrCircle2Circle2Result<double>;
-using Circle2Circle2IntrType = cavc::Circle2Circle2IntrType;
+using Vector2 = cavccpp::Vector2<double>;
+using IntrCircle2Circle2Result = cavccpp::IntrCircle2Circle2Result<double>;
+using Circle2Circle2IntrType = cavccpp::Circle2Circle2IntrType;
 
 namespace {
 
@@ -22,39 +22,39 @@ bool approxEqual(const Vector2 &a, const Vector2 &b, double epsilon = EPSILON) {
 
 TEST(intrcircle2circle2, coincident_circles) {
   // Two identical circles should be coincident
-  auto result = cavc::intrCircle2Circle2(1.0, Vector2{0.0, 0.0}, 1.0, Vector2{0.0, 0.0});
+  auto result = cavccpp::intrCircle2Circle2(1.0, Vector2{0.0, 0.0}, 1.0, Vector2{0.0, 0.0});
   EXPECT_EQ(result.intrType, Circle2Circle2IntrType::Coincident);
 }
 
 TEST(intrcircle2circle2, no_intersect_far_apart) {
   // Two circles far apart should not intersect
-  auto result = cavc::intrCircle2Circle2(1.0, Vector2{0.0, 0.0}, 1.0, Vector2{5.0, 0.0});
+  auto result = cavccpp::intrCircle2Circle2(1.0, Vector2{0.0, 0.0}, 1.0, Vector2{5.0, 0.0});
   EXPECT_EQ(result.intrType, Circle2Circle2IntrType::NoIntersect);
 }
 
 TEST(intrcircle2circle2, no_intersect_one_inside_other) {
   // Small circle inside large circle with no intersection
-  auto result = cavc::intrCircle2Circle2(0.5, Vector2{0.0, 0.0}, 2.0, Vector2{0.0, 0.0});
+  auto result = cavccpp::intrCircle2Circle2(0.5, Vector2{0.0, 0.0}, 2.0, Vector2{0.0, 0.0});
   EXPECT_EQ(result.intrType, Circle2Circle2IntrType::NoIntersect);
 }
 
 TEST(intrcircle2circle2, external_tangent) {
   // Two circles touching externally (one intersection point)
-  auto result = cavc::intrCircle2Circle2(1.0, Vector2{0.0, 0.0}, 1.0, Vector2{2.0, 0.0});
+  auto result = cavccpp::intrCircle2Circle2(1.0, Vector2{0.0, 0.0}, 1.0, Vector2{2.0, 0.0});
   EXPECT_EQ(result.intrType, Circle2Circle2IntrType::OneIntersect);
   EXPECT_TRUE(approxEqual(result.point1, Vector2{1.0, 0.0}));
 }
 
 TEST(intrcircle2circle2, internal_tangent) {
   // Large circle containing smaller circle, touching internally
-  auto result = cavc::intrCircle2Circle2(2.0, Vector2{0.0, 0.0}, 1.0, Vector2{1.0, 0.0});
+  auto result = cavccpp::intrCircle2Circle2(2.0, Vector2{0.0, 0.0}, 1.0, Vector2{1.0, 0.0});
   EXPECT_EQ(result.intrType, Circle2Circle2IntrType::OneIntersect);
   EXPECT_TRUE(approxEqual(result.point1, Vector2{2.0, 0.0}));
 }
 
 TEST(intrcircle2circle2, two_intersects_horizontal) {
   // Two circles intersecting at two points (horizontal alignment)
-  auto result = cavc::intrCircle2Circle2(1.0, Vector2{0.0, 0.0}, 1.0, Vector2{1.0, 0.0});
+  auto result = cavccpp::intrCircle2Circle2(1.0, Vector2{0.0, 0.0}, 1.0, Vector2{1.0, 0.0});
   EXPECT_EQ(result.intrType, Circle2Circle2IntrType::TwoIntersects);
 
   // The intersection points should be at (0.5, ±sqrt(3)/2)
@@ -69,7 +69,7 @@ TEST(intrcircle2circle2, two_intersects_horizontal) {
 
 TEST(intrcircle2circle2, two_intersects_vertical) {
   // Two circles intersecting at two points (vertical alignment)
-  auto result = cavc::intrCircle2Circle2(1.0, Vector2{0.0, 0.0}, 1.0, Vector2{0.0, 1.0});
+  auto result = cavccpp::intrCircle2Circle2(1.0, Vector2{0.0, 0.0}, 1.0, Vector2{0.0, 1.0});
   EXPECT_EQ(result.intrType, Circle2Circle2IntrType::TwoIntersects);
 
   // The intersection points should be at (±sqrt(3)/2, 0.5)
@@ -83,7 +83,7 @@ TEST(intrcircle2circle2, two_intersects_vertical) {
 
 TEST(intrcircle2circle2, two_intersects_diagonal) {
   // Two circles intersecting at two points (diagonal alignment)
-  auto result = cavc::intrCircle2Circle2(1.0, Vector2{0.0, 0.0}, 1.0, Vector2{1.0, 1.0});
+  auto result = cavccpp::intrCircle2Circle2(1.0, Vector2{0.0, 0.0}, 1.0, Vector2{1.0, 1.0});
   EXPECT_EQ(result.intrType, Circle2Circle2IntrType::TwoIntersects);
 
   // Should have two intersection points
@@ -92,7 +92,7 @@ TEST(intrcircle2circle2, two_intersects_diagonal) {
 
 TEST(intrcircle2circle2, different_radii_intersect) {
   // Circles with different radii intersecting
-  auto result = cavc::intrCircle2Circle2(1.0, Vector2{0.0, 0.0}, 2.0, Vector2{2.0, 0.0});
+  auto result = cavccpp::intrCircle2Circle2(1.0, Vector2{0.0, 0.0}, 2.0, Vector2{2.0, 0.0});
   EXPECT_EQ(result.intrType, Circle2Circle2IntrType::TwoIntersects);
 
   // Should have two distinct intersection points
@@ -101,66 +101,67 @@ TEST(intrcircle2circle2, different_radii_intersect) {
 
 TEST(intrcircle2circle2, different_radii_external_tangent) {
   // Circles with different radii touching externally
-  auto result = cavc::intrCircle2Circle2(1.0, Vector2{0.0, 0.0}, 2.0, Vector2{3.0, 0.0});
+  auto result = cavccpp::intrCircle2Circle2(1.0, Vector2{0.0, 0.0}, 2.0, Vector2{3.0, 0.0});
   EXPECT_EQ(result.intrType, Circle2Circle2IntrType::OneIntersect);
   EXPECT_TRUE(approxEqual(result.point1, Vector2{1.0, 0.0}));
 }
 
 TEST(intrcircle2circle2, different_radii_internal_tangent) {
   // Circles with different radii touching internally
-  auto result = cavc::intrCircle2Circle2(3.0, Vector2{0.0, 0.0}, 1.0, Vector2{2.0, 0.0});
+  auto result = cavccpp::intrCircle2Circle2(3.0, Vector2{0.0, 0.0}, 1.0, Vector2{2.0, 0.0});
   EXPECT_EQ(result.intrType, Circle2Circle2IntrType::OneIntersect);
   EXPECT_TRUE(approxEqual(result.point1, Vector2{3.0, 0.0}));
 }
 
 TEST(intrcircle2circle2, very_small_circles) {
   // Test with very small circles
-  auto result = cavc::intrCircle2Circle2(0.001, Vector2{0.0, 0.0}, 0.001, Vector2{0.0015, 0.0});
+  auto result = cavccpp::intrCircle2Circle2(0.001, Vector2{0.0, 0.0}, 0.001, Vector2{0.0015, 0.0});
   EXPECT_EQ(result.intrType, Circle2Circle2IntrType::TwoIntersects);
 }
 
 TEST(intrcircle2circle2, large_circles) {
   // Test with large circles
-  auto result = cavc::intrCircle2Circle2(1000.0, Vector2{0.0, 0.0}, 1000.0, Vector2{1500.0, 0.0});
+  auto result =
+      cavccpp::intrCircle2Circle2(1000.0, Vector2{0.0, 0.0}, 1000.0, Vector2{1500.0, 0.0});
   EXPECT_EQ(result.intrType, Circle2Circle2IntrType::TwoIntersects);
 }
 
 TEST(intrcircle2circle2, zero_radius_first) {
   // Point (zero radius) and circle
-  auto result = cavc::intrCircle2Circle2(0.0, Vector2{1.0, 0.0}, 1.0, Vector2{0.0, 0.0});
+  auto result = cavccpp::intrCircle2Circle2(0.0, Vector2{1.0, 0.0}, 1.0, Vector2{0.0, 0.0});
   EXPECT_EQ(result.intrType, Circle2Circle2IntrType::OneIntersect);
   EXPECT_TRUE(approxEqual(result.point1, Vector2{1.0, 0.0}));
 }
 
 TEST(intrcircle2circle2, zero_radius_second) {
   // Circle and point (zero radius)
-  auto result = cavc::intrCircle2Circle2(1.0, Vector2{0.0, 0.0}, 0.0, Vector2{1.0, 0.0});
+  auto result = cavccpp::intrCircle2Circle2(1.0, Vector2{0.0, 0.0}, 0.0, Vector2{1.0, 0.0});
   EXPECT_EQ(result.intrType, Circle2Circle2IntrType::OneIntersect);
   EXPECT_TRUE(approxEqual(result.point1, Vector2{1.0, 0.0}));
 }
 
 TEST(intrcircle2circle2, both_zero_radius_same_point) {
   // Two points at same location
-  auto result = cavc::intrCircle2Circle2(0.0, Vector2{1.0, 1.0}, 0.0, Vector2{1.0, 1.0});
+  auto result = cavccpp::intrCircle2Circle2(0.0, Vector2{1.0, 1.0}, 0.0, Vector2{1.0, 1.0});
   EXPECT_EQ(result.intrType, Circle2Circle2IntrType::Coincident);
 }
 
 TEST(intrcircle2circle2, both_zero_radius_different_points) {
   // Two points at different locations
-  auto result = cavc::intrCircle2Circle2(0.0, Vector2{0.0, 0.0}, 0.0, Vector2{1.0, 1.0});
+  auto result = cavccpp::intrCircle2Circle2(0.0, Vector2{0.0, 0.0}, 0.0, Vector2{1.0, 1.0});
   EXPECT_EQ(result.intrType, Circle2Circle2IntrType::NoIntersect);
 }
 
 TEST(intrcircle2circle2, negative_coordinates) {
   // Test with negative coordinates
-  auto result = cavc::intrCircle2Circle2(1.0, Vector2{-1.0, -1.0}, 1.0, Vector2{-1.0, 0.0});
+  auto result = cavccpp::intrCircle2Circle2(1.0, Vector2{-1.0, -1.0}, 1.0, Vector2{-1.0, 0.0});
   EXPECT_EQ(result.intrType, Circle2Circle2IntrType::TwoIntersects);
 }
 
 TEST(intrcircle2circle2, precision_edge_case) {
   // Test near the precision boundary
-  double distance = 2.0 + cavc::utils::realThreshold<double>() / 2.0;
-  auto result = cavc::intrCircle2Circle2(1.0, Vector2{0.0, 0.0}, 1.0, Vector2{distance, 0.0});
+  double distance = 2.0 + cavccpp::utils::realThreshold<double>() / 2.0;
+  auto result = cavccpp::intrCircle2Circle2(1.0, Vector2{0.0, 0.0}, 1.0, Vector2{distance, 0.0});
   // Should be close to tangent, might be OneIntersect or TwoIntersects depending on precision
   EXPECT_TRUE(result.intrType == Circle2Circle2IntrType::OneIntersect ||
               result.intrType == Circle2Circle2IntrType::TwoIntersects);

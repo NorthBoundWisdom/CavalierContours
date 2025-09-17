@@ -4,7 +4,7 @@
 #include "vector.hpp"
 #include <cmath>
 
-namespace cavc {
+namespace cavccpp {
 template <typename Real> using Vector2 = Vector<Real, 2>;
 
 /// Perpendicular vector to v (rotating counter clockwise).
@@ -121,6 +121,6 @@ bool pointWithinArcSweepAngle(Vector2<Real> const &center, Vector2<Real> const &
 
   return isRightOrCoincident(center, arcStart, point) && isLeftOrCoincident(center, arcEnd, point);
 }
-} // namespace cavc
+} // namespace cavccpp
 
 #endif // CAVC_VECTOR2_HPP
