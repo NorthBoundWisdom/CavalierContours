@@ -2,6 +2,7 @@
 #define CAVC_MATHUTILS_HPP
 
 #include "internal/common.hpp"
+#include <atomic>
 #include <cmath>
 #include <iterator>
 
@@ -27,39 +28,66 @@ template <typename Real> constexpr EpsilonConfig<Real> defaultEpsilonConfig() {
           defaultSliceJoinThreshold<Real>(), defaultOffsetThreshold<Real>()};
 }
 
-template <typename Real> EpsilonConfig<Real> &epsilonConfig() {
-  static EpsilonConfig<Real> config = defaultEpsilonConfig<Real>();
+template <typename Real> struct AtomicEpsilonConfig {
+  std::atomic<Real> realThreshold;
+  std::atomic<Real> realPrecision;
+  std::atomic<Real> sliceJoinThreshold;
+  std::atomic<Real> offsetThreshold;
+
+  explicit AtomicEpsilonConfig(EpsilonConfig<Real> const &config)
+      : realThreshold(config.realThreshold), realPrecision(config.realPrecision),
+        sliceJoinThreshold(config.sliceJoinThreshold), offsetThreshold(config.offsetThreshold) {}
+};
+
+template <typename Real> AtomicEpsilonConfig<Real> &epsilonConfig() {
+  static AtomicEpsilonConfig<Real> config(defaultEpsilonConfig<Real>());
   return config;
 }
 
-template <typename Real> EpsilonConfig<Real> getEpsilonConfig() { return epsilonConfig<Real>(); }
+template <typename Real> EpsilonConfig<Real> getEpsilonConfig() {
+  auto &config = epsilonConfig<Real>();
+  return {config.realThreshold.load(std::memory_order_relaxed),
+          config.realPrecision.load(std::memory_order_relaxed),
+          config.sliceJoinThreshold.load(std::memory_order_relaxed),
+          config.offsetThreshold.load(std::memory_order_relaxed)};
+}
 
 template <typename Real> void setEpsilonConfig(EpsilonConfig<Real> const &config) {
   CAVC_ASSERT(config.realThreshold > Real(0), "realThreshold must be > 0");
   CAVC_ASSERT(config.realPrecision > Real(0), "realPrecision must be > 0");
   CAVC_ASSERT(config.sliceJoinThreshold > Real(0), "sliceJoinThreshold must be > 0");
   CAVC_ASSERT(config.offsetThreshold > Real(0), "offsetThreshold must be > 0");
-  epsilonConfig<Real>() = config;
+  auto &current = epsilonConfig<Real>();
+  current.realThreshold.store(config.realThreshold, std::memory_order_relaxed);
+  current.realPrecision.store(config.realPrecision, std::memory_order_relaxed);
+  current.sliceJoinThreshold.store(config.sliceJoinThreshold, std::memory_order_relaxed);
+  current.offsetThreshold.store(config.offsetThreshold, std::memory_order_relaxed);
 }
 
 template <typename Real> void resetEpsilonConfig() {
-  epsilonConfig<Real>() = defaultEpsilonConfig<Real>();
+  setEpsilonConfig(defaultEpsilonConfig<Real>());
 }
 
 // absolute threshold to be used for comparing reals generally
-template <typename Real> Real realThreshold() { return epsilonConfig<Real>().realThreshold; }
+template <typename Real> Real realThreshold() {
+  return epsilonConfig<Real>().realThreshold.load(std::memory_order_relaxed);
+}
 
 // absolute threshold to be used for reals in common geometric computation (e.g. to check for
 // singularities)
-template <typename Real> Real realPrecision() { return epsilonConfig<Real>().realPrecision; }
+template <typename Real> Real realPrecision() {
+  return epsilonConfig<Real>().realPrecision.load(std::memory_order_relaxed);
+}
 
 // absolute threshold to be used for joining slices together at end points
 template <typename Real> Real sliceJoinThreshold() {
-  return epsilonConfig<Real>().sliceJoinThreshold;
+  return epsilonConfig<Real>().sliceJoinThreshold.load(std::memory_order_relaxed);
 }
 
 // absolute threshold to be used for pruning invalid slices for offset
-template <typename Real> Real offsetThreshold() { return epsilonConfig<Real>().offsetThreshold; }
+template <typename Real> Real offsetThreshold() {
+  return epsilonConfig<Real>().offsetThreshold.load(std::memory_order_relaxed);
+}
 
 template <typename Real> constexpr Real pi() { return Real(3.14159265358979323846264338327950288); }
 

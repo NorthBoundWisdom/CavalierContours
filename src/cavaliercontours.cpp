@@ -88,7 +88,9 @@ static cavc::OffsetEndCapType to_cpp_offset_end_cap_type(cavc_offset_end_cap_typ
 
 static cavc::ParallelOffsetOptions<cavc_real>
 to_cpp_parallel_offset_options(cavc_parallel_offset_options const &options) {
-  CAVC_ASSERT(options.miter_limit >= cavc_real(1), "miter_limit must be >= 1");
+  if (options.join_type == CAVC_OFFSET_JOIN_MITER) {
+    CAVC_ASSERT(options.miter_limit >= cavc_real(1), "miter_limit must be >= 1");
+  }
   cavc::ParallelOffsetOptions<cavc_real> result;
   result.hasSelfIntersects = options.may_have_self_intersects != 0;
   result.joinType = to_cpp_offset_join_type(options.join_type);

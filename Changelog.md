@@ -25,11 +25,14 @@
   - harden `plineFromVertexes` helper to safely support empty input
   - refactor `combine_with_self_invariants` into closed-only parameterized suite (remove stale
     runtime skips on open half-circle cases)
-- Unify parallel offset options shape for upcoming Join/EndCap work:
+- Unify parallel offset options shape for join/end-cap controls:
   - C++: add `ParallelOffsetOptions`, `OffsetJoinType`, `OffsetEndCapType`
   - C API: replace offset bit flags with `cavc_parallel_offset_options`
   - add `cavc_parallel_offset_default_options`
-  - keep behavior unchanged: only `round` join/end cap are currently implemented
+- Clarify `miter_limit` validation semantics:
+  - enforce `miter_limit >= 1` only when `join_type`/`joinType` is miter
+- Improve runtime tolerance configuration reliability:
+  - make tolerance reads/writes thread-safe for concurrent API usage
 - Extend join behavior incrementally:
   - add `miter/bevel` for line-line joins in `parallelOffset`
   - add `miter_limit` option (C++ and C API) with line-line and arc-involved miter clipping

@@ -1610,7 +1610,9 @@ template <typename Real>
 std::vector<Polyline<Real>> parallelOffset(Polyline<Real> const &pline, Real offset,
                                            ParallelOffsetOptions<Real> const &options = {}) {
   using namespace internal;
-  CAVC_ASSERT(options.miterLimit >= Real(1), "miterLimit must be >= 1");
+  if (options.joinType == OffsetJoinType::Miter) {
+    CAVC_ASSERT(options.miterLimit >= Real(1), "miterLimit must be >= 1");
+  }
 
   Polyline<Real> cleaned = pruneSingularities(pline, utils::realPrecision<Real>());
   if (cleaned.size() < 2) {
