@@ -301,6 +301,13 @@ void cavc_pline_prune_singularities(cavc_pline const *pline, cavc_real epsilon,
   CAVC_END_TRY_CATCH
 }
 
+void cavc_pline_remove_redundant(cavc_pline *pline, cavc_real epsilon) {
+  CAVC_ASSERT(pline, "null pline not allowed");
+  CAVC_BEGIN_TRY_CATCH
+  pline->data = cavc::removeRedundant(pline->data, epsilon);
+  CAVC_END_TRY_CATCH
+}
+
 void cavc_pline_convert_arcs_to_lines(cavc_pline const *pline, cavc_real error,
                                       cavc_pline **output) {
   CAVC_ASSERT(pline, "null pline not allowed");

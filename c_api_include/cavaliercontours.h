@@ -166,6 +166,11 @@ CAVC_API void cavc_pline_invert_direction(cavc_pline *pline);
 CAVC_API void cavc_pline_prune_singularities(cavc_pline const *pline, cavc_real epsilon,
                                              cavc_pline **output);
 
+// Remove redundant vertexes from the polyline in place. Redundant vertexes can come from repeated
+// positions, collinear line segments, or concentric arc segments that can be merged without
+// changing the represented curve.
+CAVC_API void cavc_pline_remove_redundant(cavc_pline *pline, cavc_real epsilon);
+
 // Create a new polyline with all arc segments approximated by line segments.
 CAVC_API void cavc_pline_convert_arcs_to_lines(cavc_pline const *pline, cavc_real error,
                                                cavc_pline **output);

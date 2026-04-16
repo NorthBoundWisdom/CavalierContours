@@ -1,5 +1,8 @@
 #ifndef CAVC_POLYLINEOFFSET_HPP
 #define CAVC_POLYLINEOFFSET_HPP
+#include <algorithm>
+#include <functional>
+
 #include "polyline.hpp"
 #include "polylineintersects.hpp"
 #include <limits>
@@ -1603,6 +1606,178 @@ stitchOffsetSlicesTogether(std::vector<OpenPolylineSlice<Real>> const &slices, b
 
   return result;
 }
+
+template <typename Real> bool isSimpleClosedPolyline(Polyline<Real> const &candidate) {
+  if (!candidate.isClosed() || candidate.size() < 3) {
+    return false;
+  }
+
+  auto spatialIndex = createApproxSpatialIndex(candidate);
+  std::vector<PlineIntersect<Real>> intersects;
+  allSelfIntersects(candidate, intersects, spatialIndex);
+  return intersects.empty();
+}
+
+template <typename Real>
+std::vector<Polyline<Real>> filterSimpleClosedLoops(std::vector<Polyline<Real>> const &candidates) {
+  std::vector<Polyline<Real>> filtered;
+  filtered.reserve(candidates.size());
+  for (auto const &candidate : candidates) {
+    if (!isSimpleClosedPolyline(candidate)) {
+      continue;
+    }
+
+    filtered.push_back(candidate);
+  }
+
+  return filtered;
+}
+
+template <typename Real>
+std::vector<Polyline<Real>> filterCollapsedLineLoops(std::vector<Polyline<Real>> const &candidates) {
+  if (candidates.size() != 1) {
+    return {};
+  }
+
+  if (candidates[0].size() != 2) {
+    return {};
+  }
+
+  return candidates;
+}
+
+template <typename Real>
+std::vector<Polyline<Real>>
+stitchSlicesIntoSimpleClosedLoops(std::vector<OpenPolylineSlice<Real>> const &slices,
+                                  std::size_t origMaxIndex,
+                                  Real joinThreshold = utils::sliceJoinThreshold<Real>()) {
+  std::vector<Polyline<Real>> result;
+  if (slices.empty()) {
+    return result;
+  }
+
+  // This search is only a salvage path for fragmented closed offsets; keep it bounded so pathological
+  // slice graphs do not explode exponentially. Callers fall back to returning no loops rather than
+  // invalid geometry when the search budget is exceeded.
+  constexpr std::size_t maxSearchSlices = 24;
+  if (slices.size() > maxSearchSlices) {
+    return result;
+  }
+
+  StaticSpatialIndex<Real> spatialIndex(slices.size());
+  for (auto const &slice : slices) {
+    auto const &point = slice.pline[0].pos();
+    spatialIndex.add(point.x() - joinThreshold, point.y() - joinThreshold,
+                     point.x() + joinThreshold, point.y() + joinThreshold);
+  }
+  spatialIndex.finish();
+
+  auto forwardDistance = [&](std::size_t from, std::size_t to) {
+    std::size_t const maxIndex = std::numeric_limits<std::size_t>::max();
+    std::size_t const fromIndex = slices[from].intrStartIndex;
+    std::size_t const toIndex = slices[to].intrStartIndex;
+    if (fromIndex == maxIndex || toIndex == maxIndex) {
+      return std::size_t{0};
+    }
+    if (fromIndex <= toIndex) {
+      return toIndex - fromIndex;
+    }
+    return origMaxIndex - fromIndex + toIndex;
+  };
+
+  std::vector<std::vector<std::size_t>> nextIndexes(slices.size());
+  std::vector<std::size_t> queryResults;
+  std::vector<std::size_t> queryStack;
+  queryStack.reserve(8);
+
+  for (std::size_t i = 0; i < slices.size(); ++i) {
+    auto const &currEndPoint = slices[i].pline.lastVertex().pos();
+    queryResults.clear();
+    spatialIndex.query(currEndPoint.x() - joinThreshold, currEndPoint.y() - joinThreshold,
+                       currEndPoint.x() + joinThreshold, currEndPoint.y() + joinThreshold,
+                       queryResults, queryStack);
+
+    queryResults.erase(std::remove(queryResults.begin(), queryResults.end(), i), queryResults.end());
+    std::sort(queryResults.begin(), queryResults.end(),
+              [&](std::size_t left, std::size_t right) {
+                std::size_t const leftDist = forwardDistance(i, left);
+                std::size_t const rightDist = forwardDistance(i, right);
+                if (leftDist != rightDist) {
+                  return leftDist > rightDist;
+                }
+                if (slices[left].pline.size() != slices[right].pline.size()) {
+                  return slices[left].pline.size() > slices[right].pline.size();
+                }
+                return left < right;
+              });
+    nextIndexes[i] = std::move(queryResults);
+  }
+
+  std::vector<bool> usedIndexes(slices.size(), false);
+  std::vector<bool> localUsed(slices.size(), false);
+  std::vector<std::size_t> path;
+  std::vector<std::size_t> acceptedPath;
+  Polyline<Real> acceptedLoop;
+
+  std::function<bool(std::size_t, Polyline<Real> const &)> dfs =
+      [&](std::size_t currIndex, Polyline<Real> const &currPline) {
+        if (currPline.size() > 2 &&
+            fuzzyEqual(currPline[0].pos(), currPline.lastVertex().pos(), joinThreshold)) {
+          Polyline<Real> closedLoop = currPline;
+          closedLoop.isClosed() = true;
+          closedLoop.vertexes().pop_back();
+          if (isSimpleClosedPolyline(closedLoop) && getPathLength(closedLoop) > Real(1e-2)) {
+            acceptedPath = path;
+            acceptedLoop = std::move(closedLoop);
+            return true;
+          }
+        }
+
+        for (std::size_t nextIndex : nextIndexes[currIndex]) {
+          if (usedIndexes[nextIndex] || localUsed[nextIndex]) {
+            continue;
+          }
+
+          Polyline<Real> nextPline = currPline;
+          nextPline.vertexes().pop_back();
+          nextPline.vertexes().insert(nextPline.vertexes().end(),
+                                      slices[nextIndex].pline.vertexes().begin(),
+                                      slices[nextIndex].pline.vertexes().end());
+
+          localUsed[nextIndex] = true;
+          path.push_back(nextIndex);
+          if (dfs(nextIndex, nextPline)) {
+            return true;
+          }
+          path.pop_back();
+          localUsed[nextIndex] = false;
+        }
+
+        return false;
+      };
+
+  for (std::size_t i = 0; i < slices.size(); ++i) {
+    if (usedIndexes[i]) {
+      continue;
+    }
+
+    path.clear();
+    path.push_back(i);
+    std::fill(localUsed.begin(), localUsed.end(), false);
+    localUsed[i] = true;
+    acceptedPath.clear();
+    acceptedLoop = Polyline<Real>();
+
+    if (dfs(i, slices[i].pline)) {
+      for (std::size_t index : acceptedPath) {
+        usedIndexes[index] = true;
+      }
+      result.emplace_back(std::move(acceptedLoop));
+    }
+  }
+
+  return result;
+}
 } // namespace internal
 
 /// Creates the paralell offset polylines to the polyline given.
@@ -1614,7 +1789,7 @@ std::vector<Polyline<Real>> parallelOffset(Polyline<Real> const &pline, Real off
     CAVC_ASSERT(options.miterLimit >= Real(1), "miterLimit must be >= 1");
   }
 
-  Polyline<Real> cleaned = pruneSingularities(pline, utils::realPrecision<Real>());
+  Polyline<Real> cleaned = removeRedundant(pline, utils::realPrecision<Real>());
   if (cleaned.size() < 2) {
     return std::vector<Polyline<Real>>();
   }
@@ -1625,30 +1800,19 @@ std::vector<Polyline<Real>> parallelOffset(Polyline<Real> const &pline, Real off
   if (cleaned.isClosed() && !options.hasSelfIntersects) {
     auto slices = slicesFromRawOffset(cleaned, rawOffset, offset);
     auto result = stitchOffsetSlicesTogether(slices, cleaned.isClosed(), rawOffset.size() - 1);
-
-    auto filterSimpleClosedLoops = [](std::vector<Polyline<Real>> const &candidates) {
-      std::vector<Polyline<Real>> filtered;
-      filtered.reserve(candidates.size());
-      for (auto const &candidate : candidates) {
-        if (!candidate.isClosed() || candidate.size() < 3) {
-          continue;
-        }
-
-        auto spatialIndex = createApproxSpatialIndex(candidate);
-        std::vector<PlineIntersect<Real>> intersects;
-        allSelfIntersects(candidate, intersects, spatialIndex);
-        if (!intersects.empty()) {
-          continue;
-        }
-
-        filtered.push_back(candidate);
-      }
-      return filtered;
-    };
-
     auto filteredResult = filterSimpleClosedLoops(result);
     if (!filteredResult.empty()) {
       return filteredResult;
+    }
+
+    auto collapsedLineResult = filterCollapsedLineLoops(result);
+    if (!collapsedLineResult.empty()) {
+      return collapsedLineResult;
+    }
+
+    auto rescuedResult = stitchSlicesIntoSimpleClosedLoops(slices, rawOffset.size() - 1);
+    if (!rescuedResult.empty()) {
+      return rescuedResult;
     }
 
     auto tryRoundFallback = [&]() {
@@ -1665,13 +1829,33 @@ std::vector<Polyline<Real>> parallelOffset(Polyline<Real> const &pline, Real off
       }
     }
 
-    return result;
+    return std::vector<Polyline<Real>>();
   }
 
   // not closed polyline or has self intersects, must apply dual clipping
   auto dualRawOffset = createRawOffsetPline(cleaned, -offset, options);
   auto slices = dualSliceAtIntersectsForOffset(cleaned, rawOffset, dualRawOffset, offset, options);
-  return stitchOffsetSlicesTogether(slices, cleaned.isClosed(), rawOffset.size() - 1);
+  auto result = stitchOffsetSlicesTogether(slices, cleaned.isClosed(), rawOffset.size() - 1);
+  if (!cleaned.isClosed()) {
+    return result;
+  }
+
+  auto filteredResult = filterSimpleClosedLoops(result);
+  if (!filteredResult.empty()) {
+    return filteredResult;
+  }
+
+  auto collapsedLineResult = filterCollapsedLineLoops(result);
+  if (!collapsedLineResult.empty()) {
+    return collapsedLineResult;
+  }
+
+  auto rescuedResult = stitchSlicesIntoSimpleClosedLoops(slices, rawOffset.size() - 1);
+  if (!rescuedResult.empty()) {
+    return rescuedResult;
+  }
+
+  return std::vector<Polyline<Real>>();
 }
 
 } // namespace cavc

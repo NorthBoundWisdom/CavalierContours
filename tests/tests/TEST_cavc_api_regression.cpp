@@ -10,6 +10,7 @@
 
 #include "c_api_include/cavaliercontours.h"
 #include "c_api_test_helpers.hpp"
+#include "shape_offset_self_intersect_case.hpp"
 
 namespace t = testing;
 
@@ -149,6 +150,18 @@ std::vector<cavc_vertex> makeOffsetCase1Vertexes() {
       {28.0, 0.0, 0.5},
       {39.0, 21.0, 0.0},
       {28.0, 12.0, 0.5},
+  };
+}
+
+std::vector<cavc_vertex> makeCollapsedCombVertexes() {
+  return {
+      {0.0, 0.0, 0.0},          {60.0, 0.0, 0.0},         {60.0, 20.0, 0.0},
+      {59.0, 20.0, 0.0},        {59.0, 18.0, 0.0},        {57.0, 18.0, 0.0},
+      {57.0, 20.0, 0.0},        {39.666666666667, 20.0, 0.0},
+      {39.666666666667, 18.0, 0.0},                         {37.666666666667, 18.0, 0.0},
+      {37.666666666667, 20.0, 0.0},                         {20.333333333333, 20.0, 0.0},
+      {20.333333333333, 18.0, 0.0},                         {18.333333333333, 18.0, 0.0},
+      {18.333333333333, 20.0, 0.0},                         {0.0, 20.0, 0.0},
   };
 }
 
@@ -1331,6 +1344,20 @@ TEST(CApiRegression, PruneSingularitiesRemovesDuplicatePositions) {
   EXPECT_THAT(actual, t::Pointwise(VertexEqual(), expected));
 }
 
+TEST(CApiRegression, RemoveRedundantSimplifiesInPlace) {
+  std::vector<cavc_vertex> redundant = {
+      {0.0, 0.0, 0.0}, {1.0, 1.0, 0.0}, {2.0, 2.0, 0.0}, {2.0, 2.0, 0.2}, {2.0, 3.0, 0.0}};
+  PlinePtr pline(plineFromVertexes(redundant, false));
+
+  cavc_pline_remove_redundant(pline.get(), 1e-5);
+
+  std::vector<cavc_vertex> expected = {
+      {0.0, 0.0, 0.0}, {2.0, 2.0, 0.2}, {2.0, 3.0, 0.0}};
+  std::vector<cavc_vertex> actual = readVertexes(pline.get());
+  EXPECT_THAT(actual, t::Pointwise(VertexFuzzyEqual(), expected));
+  EXPECT_EQ(cavc_pline_is_closed(pline.get()), 0);
+}
+
 TEST(CApiRegression, ConvertArcsToLinesProducesLineSegments) {
   const cavc_real radius = 2.0;
   std::vector<cavc_vertex> circle = {{0.0, 0.0, 1.0}, {2.0 * radius, 0.0, 1.0}};
@@ -1538,6 +1565,55 @@ TEST(CApiRegression, TolerancesSetGetResetRoundTrip) {
   EXPECT_EQ(after_reset.real_precision, defaults.real_precision);
   EXPECT_EQ(after_reset.slice_join_threshold, defaults.slice_join_threshold);
   EXPECT_EQ(after_reset.offset_threshold, defaults.offset_threshold);
+}
+
+TEST(CApiRegression, ParallelOffsetReportedShapeCaseReproducesSelfIntersection) {
+  const std::vector<cavc_vertex> input_vertexes = makeShapeOffsetSelfIntersectInputVertexes();
+  ASSERT_EQ(input_vertexes.size(), 249u);
+
+  PlinePtr input(plineFromVertexes(input_vertexes, true));
+  ASSERT_NE(input.get(), nullptr);
+  EXPECT_LT(cavc_get_area(input.get()), 0.0);
+
+  cavc_pline *raw_normalized = nullptr;
+  cavc_pline_normalize(input.get(), 1e-5, CAVC_WINDING_COUNTER_CLOCKWISE, &raw_normalized);
+  PlinePtr normalized(raw_normalized);
+  ASSERT_NE(normalized.get(), nullptr);
+  EXPECT_GT(cavc_get_area(normalized.get()), 0.0);
+
+  cavc_pline_list *raw_results = nullptr;
+  cavc_parallel_offset(normalized.get(), -0.125, &raw_results, defaultParallelOffsetOptions());
+  PlineListPtr results(raw_results);
+
+  ASSERT_NE(results.get(), nullptr);
+  ASSERT_EQ(cavc_pline_list_count(results.get()), 1u);
+  uint32_t open_count = 0;
+  uint32_t self_intersecting_count = 0;
+  for (uint32_t i = 0; i < cavc_pline_list_count(results.get()); ++i) {
+    cavc_pline const *result = cavc_pline_list_get(results.get(), i);
+    open_count += cavc_pline_is_closed(result) == 0 ? 1u : 0u;
+    self_intersecting_count += hasSelfIntersect(result) ? 1u : 0u;
+  }
+
+  EXPECT_EQ(open_count, 0u);
+  EXPECT_EQ(self_intersecting_count, 0u);
+}
+
+TEST(CApiRegression, ParallelOffsetCollapsedCombPrefersSimpleClosedLoop) {
+  PlinePtr input(plineFromVertexes(makeCollapsedCombVertexes(), true));
+  ASSERT_NE(input.get(), nullptr);
+
+  cavc_pline_list *raw_results = nullptr;
+  cavc_parallel_offset(input.get(), -1.0, &raw_results, defaultParallelOffsetOptions());
+  PlineListPtr results(raw_results);
+
+  ASSERT_NE(results.get(), nullptr);
+  ASSERT_EQ(cavc_pline_list_count(results.get()), 1u);
+
+  cavc_pline *result = cavc_pline_list_get(results.get(), 0);
+  EXPECT_EQ(cavc_pline_is_closed(result), 1);
+  EXPECT_FALSE(hasSelfIntersect(result));
+  EXPECT_GT(cavc_get_area(result), 1000.0);
 }
 
 int main(int argc, char **argv) {

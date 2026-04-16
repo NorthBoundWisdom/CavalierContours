@@ -5,6 +5,7 @@
 #include "staticspatialindex.hpp"
 #include "vector2.hpp"
 #include <algorithm>
+#include <optional>
 #include <vector>
 
 // This header has the polyline definition and common computation functions that work with polylines
@@ -352,6 +353,233 @@ Polyline<Real> pruneSingularities(Polyline<Real> const &pline, Real epsilon) {
   }
 
   return result;
+}
+
+/// Returns a new polyline with redundant vertexes removed. Redundant vertexes can arise from
+/// repeating positions, collinear line segments that continue in the same direction, or concentric
+/// arc segments with the same orientation whose combined sweep remains under PI.
+template <typename Real>
+Polyline<Real> removeRedundant(Polyline<Real> const &pline,
+                               Real epsilon = utils::realPrecision<Real>()) {
+  using PVertex = PlineVertex<Real>;
+
+  std::size_t const vertexCount = pline.size();
+  if (vertexCount < 2) {
+    return pline;
+  }
+
+  if (vertexCount == 2) {
+    if (fuzzyEqual(pline[0].pos(), pline[1].pos(), epsilon)) {
+      Polyline<Real> result;
+      result.isClosed() = pline.isClosed();
+      result.addVertex(pline[1]);
+      return result;
+    }
+    return pline;
+  }
+
+  auto makeCopy = [&](std::size_t endExclusive) {
+    Polyline<Real> result;
+    result.isClosed() = pline.isClosed();
+    result.vertexes().reserve(vertexCount);
+    for (std::size_t k = 0; k < endExclusive; ++k) {
+      result.addVertex(pline[k]);
+    }
+    return result;
+  };
+
+  auto isCollinearSameDir = [&](PVertex const &v1, PVertex const &v2, PVertex const &v3) {
+    if (fuzzyEqual(v2.pos(), v3.pos(), epsilon)) {
+      return true;
+    }
+
+    Real const signedArea2 =
+        v1.x() * (v2.y() - v3.y()) + v2.x() * (v3.y() - v1.y()) + v3.x() * (v1.y() - v2.y());
+    bool const collinear = utils::fuzzyEqual(signedArea2, Real(0), epsilon);
+    bool const sameDirection = dot(v3.pos() - v2.pos(), v2.pos() - v1.pos()) > -epsilon;
+    return collinear && sameDirection;
+  };
+
+  PVertex v1 = pline[0];
+  PVertex v2 = pline[1];
+
+  std::size_t i = 2;
+  std::optional<Polyline<Real>> result;
+
+  while (fuzzyEqual(v1.pos(), v2.pos(), epsilon)) {
+    v1.bulge() = v2.bulge();
+    if (i >= vertexCount) {
+      break;
+    }
+    v2 = pline[i];
+    ++i;
+  }
+
+  if (i != 2) {
+    result.emplace();
+    result->isClosed() = pline.isClosed();
+    result->vertexes().reserve(vertexCount);
+    result->addVertex(v1);
+  }
+
+  if (i >= vertexCount) {
+    if (result) {
+      return std::move(*result);
+    }
+    return pline;
+  }
+
+  std::optional<ArcRadiusAndCenter<Real>> v1V2Arc;
+  bool v1BulgeIsZero = v1.bulgeIsZero();
+  bool v2BulgeIsZero = v2.bulgeIsZero();
+  bool v1BulgeIsPos = v1.bulgeIsPos();
+  bool v2BulgeIsPos = v2.bulgeIsPos();
+
+  std::size_t const iterCount = pline.isClosed() ? vertexCount - 1 : vertexCount - 2;
+
+  auto ensureCopy = [&]() -> Polyline<Real> & {
+    if (!result) {
+      result = makeCopy(i - 1);
+    }
+    return *result;
+  };
+
+  for (std::size_t count = 0; count < iterCount; ++count, ++i) {
+    PVertex const v3 = pline[i % vertexCount];
+
+    enum class RemoveRedundantCase { IncludeVertex, DiscardVertex, UpdateV1BulgeForArc };
+    RemoveRedundantCase state = RemoveRedundantCase::IncludeVertex;
+    Real updatedBulge = Real(0);
+
+    if (fuzzyEqual(v2.pos(), v3.pos(), epsilon)) {
+      state = RemoveRedundantCase::DiscardVertex;
+    } else if (v1BulgeIsZero && v2BulgeIsZero) {
+      bool const isFinalVertexForOpen = !pline.isClosed() && i == vertexCount;
+      if (!isFinalVertexForOpen && isCollinearSameDir(v1, v2, v3)) {
+        state = RemoveRedundantCase::DiscardVertex;
+      }
+    } else if (!v1BulgeIsZero && !v2BulgeIsZero && v1BulgeIsPos == v2BulgeIsPos &&
+               !fuzzyEqual(v2.pos(), v3.pos(), epsilon)) {
+      if (!v1V2Arc) {
+        v1V2Arc = arcRadiusAndCenter(v1, v2);
+      }
+      auto const arc2 = arcRadiusAndCenter(v2, v3);
+      if (utils::fuzzyEqual(v1V2Arc->radius, arc2.radius, epsilon) &&
+          fuzzyEqual(v1V2Arc->center, arc2.center, epsilon)) {
+        Real const angle1 = angle(v1V2Arc->center, v1.pos());
+        Real const angle2 = angle(v1V2Arc->center, v2.pos());
+        Real const angle3 = angle(v1V2Arc->center, v3.pos());
+        Real const totalSweep =
+            std::abs(utils::deltaAngle(angle1, angle2)) + std::abs(utils::deltaAngle(angle2, angle3));
+        Real const avgRadius = (v1V2Arc->radius + arc2.radius) / Real(2);
+        if (avgRadius * totalSweep < avgRadius * utils::pi<Real>() + epsilon) {
+          updatedBulge =
+              v1BulgeIsPos ? std::tan(totalSweep / Real(4)) : -std::tan(totalSweep / Real(4));
+          state = RemoveRedundantCase::UpdateV1BulgeForArc;
+        }
+      }
+    }
+
+    switch (state) {
+    case RemoveRedundantCase::IncludeVertex:
+      if (result) {
+        result->addVertex(v2);
+      }
+      v1 = v2;
+      v2 = v3;
+      v1V2Arc.reset();
+      v1BulgeIsZero = v2BulgeIsZero;
+      v2BulgeIsZero = v3.bulgeIsZero();
+      v1BulgeIsPos = v2BulgeIsPos;
+      v2BulgeIsPos = v3.bulgeIsPos();
+      break;
+    case RemoveRedundantCase::DiscardVertex:
+      (void)ensureCopy();
+      v2 = v3;
+      v1V2Arc.reset();
+      v2BulgeIsZero = v3.bulgeIsZero();
+      v2BulgeIsPos = v3.bulgeIsPos();
+      break;
+    case RemoveRedundantCase::UpdateV1BulgeForArc: {
+      auto &copy = ensureCopy();
+      copy.lastVertex().bulge() = updatedBulge;
+      v1.bulge() = updatedBulge;
+      v2 = v3;
+      v1BulgeIsZero = v2BulgeIsZero;
+      v2BulgeIsZero = v3.bulgeIsZero();
+      v1BulgeIsPos = v2BulgeIsPos;
+      v2BulgeIsPos = v3.bulgeIsPos();
+      break;
+    }
+    }
+  }
+
+  if (pline.isClosed()) {
+    if (result) {
+      if (result->size() > 1 && fuzzyEqual(result->lastVertex().pos(), (*result)[0].pos(), epsilon)) {
+        result->vertexes().pop_back();
+      }
+    } else if (fuzzyEqual(pline.lastVertex().pos(), pline[0].pos(), epsilon)) {
+      result = makeCopy(vertexCount);
+      result->vertexes().pop_back();
+    }
+
+    Polyline<Real> const &curr = result ? *result : pline;
+    if (curr.size() < 2) {
+      return curr;
+    }
+
+    PVertex const wrapV3 = curr.size() > 1 ? curr[1] : curr[0];
+
+    if (v1BulgeIsZero && v2BulgeIsZero && isCollinearSameDir(v1, v2, wrapV3)) {
+      auto &copy = ensureCopy();
+      PVertex const last = copy.lastVertex();
+      copy.vertexes().pop_back();
+      copy[0] = last;
+    } else if (!v1BulgeIsZero && !v2BulgeIsZero && v1BulgeIsPos == v2BulgeIsPos &&
+               !fuzzyEqual(v2.pos(), wrapV3.pos(), epsilon)) {
+      if (!v1V2Arc) {
+        v1V2Arc = arcRadiusAndCenter(v1, v2);
+      }
+      auto const arc2 = arcRadiusAndCenter(v2, wrapV3);
+      if (utils::fuzzyEqual(v1V2Arc->radius, arc2.radius, epsilon) &&
+          fuzzyEqual(v1V2Arc->center, arc2.center, epsilon)) {
+        Real const angle1 = angle(v1V2Arc->center, v1.pos());
+        Real const angle2 = angle(v1V2Arc->center, v2.pos());
+        Real const angle3 = angle(v1V2Arc->center, wrapV3.pos());
+        Real const totalSweep =
+            std::abs(utils::deltaAngle(angle1, angle2)) + std::abs(utils::deltaAngle(angle2, angle3));
+        Real const avgRadius = (v1V2Arc->radius + arc2.radius) / Real(2);
+        if (avgRadius * totalSweep < avgRadius * utils::pi<Real>() + epsilon) {
+          Real const bulge =
+              v1BulgeIsPos ? std::tan(totalSweep / Real(4)) : -std::tan(totalSweep / Real(4));
+          auto &copy = ensureCopy();
+          PVertex last = copy.lastVertex();
+          copy.vertexes().pop_back();
+          last.bulge() = bulge;
+          copy[0] = last;
+        }
+      }
+    }
+  } else {
+    if (result) {
+      if (result->size() == 0) {
+        result->addVertex(pline.lastVertex());
+      } else if (fuzzyEqual(result->lastVertex().pos(), pline.lastVertex().pos(), epsilon)) {
+        result->lastVertex().bulge() = pline.lastVertex().bulge();
+      } else {
+        result->addVertex(pline.lastVertex());
+      }
+    } else if (fuzzyEqual(pline[vertexCount - 2].pos(), pline[vertexCount - 1].pos(), epsilon)) {
+      result = makeCopy(vertexCount);
+      result->vertexes().pop_back();
+    }
+  }
+
+  if (result) {
+    return std::move(*result);
+  }
+  return pline;
 }
 
 /// Inverts the direction of the polyline given. If polyline is closed then this just changes the

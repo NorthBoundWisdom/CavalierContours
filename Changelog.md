@@ -11,9 +11,13 @@
 - Add polyline preprocessing in C++ API:
   - `ClosedPolylineWinding` enum
   - `normalizePolyline` (prune singularities + optional closed winding normalization)
+  - `removeRedundant` and C API wrapper `cavc_pline_remove_redundant`
+  - run parallel offset on redundancy-cleaned input to match the newer preprocessing flow
+    for dense/near-degenerate real-world polylines
 - Expand C API surface with low-risk geometry helpers:
   - `cavc_pline_invert_direction`
   - `cavc_pline_prune_singularities`
+  - `cavc_pline_remove_redundant`
   - `cavc_pline_convert_arcs_to_lines`
   - `cavc_pline_normalize`
   - `cavc_spatial_index_create/delete/item_count/query_count/query`
@@ -21,6 +25,8 @@
   - `cavc_get_tolerances`, `cavc_set_tolerances`, `cavc_reset_tolerances`
 - Expand C API test coverage:
   - add `TEST_cavc_api_regression` for legacy mutating chains and new API regressions
+  - add regression coverage for real-world self-intersecting shape-offset input cleanup and
+    in-place `cavc_pline_remove_redundant`
   - fix path-length skip guard in `TEST_cavc_pline_function`
   - harden `plineFromVertexes` helper to safely support empty input
   - refactor `combine_with_self_invariants` into closed-only parameterized suite (remove stale
