@@ -10,7 +10,6 @@ macro(cavc_add_test name)
 
     target_include_directories(${name}
     PRIVATE
-        ${GTEST_INCLUDE_DIRS}
         ${CMAKE_SOURCE_DIR}
         ${CMAKE_SOURCE_DIR}/include)
 
@@ -19,9 +18,7 @@ macro(cavc_add_test name)
         PolylineFactory
         ${CAVC_CPP_HEADER_ONLY_LIB}
         ${CAVC_C_API_LIB}
-        GTest::gtest_main
-        GTest::gtest
-        GTest::gmock)
+        GTest::gmock_main)
 
     gtest_discover_tests(${name}
         WORKING_DIRECTORY ${CMAKE_BINARY_DIR}

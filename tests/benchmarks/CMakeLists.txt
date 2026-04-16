@@ -14,8 +14,7 @@ macro(add_benchmark name)
     target_include_directories(${name}
     PRIVATE
         ${CMAKE_SOURCE_DIR}
-        ${CMAKE_SOURCE_DIR}/include
-        ${benchmark_INCLUDE_DIRS})
+        ${CMAKE_SOURCE_DIR}/include)
 
     target_link_libraries(${name}
     PRIVATE
