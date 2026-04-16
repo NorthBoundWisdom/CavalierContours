@@ -1,0 +1,5 @@
+@PACKAGE_INIT@
+
+include("${CMAKE_CURRENT_LIST_DIR}/CavalierContoursTargets.cmake")
+
+set(CavalierContours_SOURCE_ROOT "${PACKAGE_PREFIX_DIR}")

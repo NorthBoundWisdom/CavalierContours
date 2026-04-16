@@ -7,6 +7,8 @@ if (NOT DEFINED PROJECT_NAME)
 endif()
 
 project(CavalierContours VERSION 0.1.0)
+include(GNUInstallDirs)
+include(CMakePackageConfigHelpers)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
@@ -20,6 +22,7 @@ endif ()
 # Build options
 option(CAVC_HEADER_ONLY "C++ header only library of CavalierContours, if ON then no library is built" OFF)
 option(CAVC_BUILD_SHARED_LIB "Build the C API CavalierContours dynamic shared library (SET OFF for static library)" ON)
+option(CAVC_INSTALL_SDK "Install CavalierContours headers/libraries and CMake package files" OFF)
 if (NOT_SUBPROJECT AND NOT CAVC_HEADER_ONLY)
     include(GoogleTest)
     enable_testing()
@@ -34,7 +37,12 @@ endif()
 
 add_library(${CAVC_CPP_HEADER_ONLY_LIB} INTERFACE)
 target_include_directories(${CAVC_CPP_HEADER_ONLY_LIB}
-  INTERFACE include/)
+  INTERFACE
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
+set_target_properties(${CAVC_CPP_HEADER_ONLY_LIB} PROPERTIES
+  EXPORT_NAME CavalierContoursHeaders)
+add_library(CavalierContours::CavalierContoursHeaders ALIAS ${CAVC_CPP_HEADER_ONLY_LIB})
 
 if(NOT CAVC_HEADER_ONLY)
   if(CAVC_BUILD_SHARED_LIB)
@@ -62,9 +70,14 @@ if(NOT CAVC_HEADER_ONLY)
   target_compile_definitions(${CAVC_C_API_LIB}
     PRIVATE CAVC_EXPORTS)
   target_include_directories(${CAVC_C_API_LIB}
-    PUBLIC c_api_include/)
+    PUBLIC
+      $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/c_api_include>
+      $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
   target_link_libraries(${CAVC_C_API_LIB}
     PRIVATE ${CAVC_CPP_HEADER_ONLY_LIB})
+  set_target_properties(${CAVC_C_API_LIB} PROPERTIES
+    EXPORT_NAME CavalierContoursCAPI)
+  add_library(CavalierContours::CavalierContoursCAPI ALIAS ${CAVC_C_API_LIB})
 endif()
 
 if (NOT_SUBPROJECT AND NOT CAVC_HEADER_ONLY)
@@ -74,4 +87,63 @@ if (NOT_SUBPROJECT AND NOT CAVC_HEADER_ONLY)
   add_subdirectory(examples)
   find_package(GTest REQUIRED)
   add_subdirectory(tests)
+endif()
+
+if(CAVC_INSTALL_SDK)
+  set(CAVC_INSTALL_TARGETS ${CAVC_CPP_HEADER_ONLY_LIB})
+  if(NOT CAVC_HEADER_ONLY)
+    list(APPEND CAVC_INSTALL_TARGETS ${CAVC_C_API_LIB})
+  endif()
+
+  install(TARGETS ${CAVC_INSTALL_TARGETS}
+    EXPORT CavalierContoursTargets
+    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR} COMPONENT CavalierContoursSDK
+    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT CavalierContoursSDK
+    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT CavalierContoursSDK
+    INCLUDES DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+
+  install(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/include/cavc/"
+    DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/cavc"
+    COMPONENT CavalierContoursSDK
+    FILES_MATCHING
+    PATTERN "*.hpp"
+  )
+
+  if(NOT CAVC_HEADER_ONLY)
+    install(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/c_api_include/"
+      DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}"
+      COMPONENT CavalierContoursSDK
+      FILES_MATCHING
+      PATTERN "*.h"
+    )
+  endif()
+
+  set(CAVC_CONFIG_INSTALL_DIR "${CMAKE_INSTALL_LIBDIR}/cmake/CavalierContours")
+  write_basic_package_version_file(
+    "${CMAKE_CURRENT_BINARY_DIR}/CavalierContoursConfigVersion.cmake"
+    VERSION ${PROJECT_VERSION}
+    COMPATIBILITY SameMajorVersion
+  )
+
+  configure_package_config_file(
+    "${CMAKE_CURRENT_SOURCE_DIR}/cmake/CavalierContoursConfig.cmake.in"
+    "${CMAKE_CURRENT_BINARY_DIR}/CavalierContoursConfig.cmake"
+    INSTALL_DESTINATION "${CAVC_CONFIG_INSTALL_DIR}"
+    NO_SET_AND_CHECK_MACRO
+    NO_CHECK_REQUIRED_COMPONENTS_MACRO
+  )
+
+  install(EXPORT CavalierContoursTargets
+    FILE CavalierContoursTargets.cmake
+    NAMESPACE CavalierContours::
+    DESTINATION "${CAVC_CONFIG_INSTALL_DIR}"
+    COMPONENT CavalierContoursSDK
+  )
+
+  install(FILES
+    "${CMAKE_CURRENT_BINARY_DIR}/CavalierContoursConfig.cmake"
+    "${CMAKE_CURRENT_BINARY_DIR}/CavalierContoursConfigVersion.cmake"
+    DESTINATION "${CAVC_CONFIG_INSTALL_DIR}"
+    COMPONENT CavalierContoursSDK
+  )
 endif()
