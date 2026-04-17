@@ -437,9 +437,10 @@ IntrPlineSegsResult<Real> intrPlineSegs(PlineVertex<Real> const &v1, PlineVertex
       // determine if arcs overlap along their sweep
       // start and sweep angles
       auto arc1StartAndSweep = startAndSweepAngle(v1.pos(), arc1.center, v1.bulge());
+      bool const sameDirectionArcs = v1.bulgeIsNeg() == u1.bulgeIsNeg();
       // we have the arcs go the same direction to simplify checks
       auto arc2StartAndSweep = [&] {
-        if (v1.bulgeIsNeg() == u1.bulgeIsNeg()) {
+        if (sameDirectionArcs) {
           return startAndSweepAngle(u1.pos(), arc2.center, u1.bulge());
         }
 
@@ -458,7 +459,7 @@ IntrPlineSegsResult<Real> intrPlineSegs(PlineVertex<Real> const &v1, PlineVertex
                  utils::realThreshold<Real>()) {
         // only end points touch at start of arc2
         result.intrType = PlineSegIntrType::OneIntersect;
-        result.point1 = u1.pos();
+        result.point1 = sameDirectionArcs ? u1.pos() : u2.pos();
       } else {
         const bool arc2StartsInArc1Sweep = utils::angleIsWithinSweep(
             arc1StartAndSweep.first, arc1StartAndSweep.second, arc2StartAndSweep.first);

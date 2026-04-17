@@ -267,6 +267,34 @@ TEST(cavc_parallel_offsetTests, parallel_offset_handles_repeat_position_input_te
   cavc_pline_delete(pline);
 }
 
+TEST(cavc_parallel_offsetTests, parallel_offset_self_intersect_hint_handles_repeated_offset_case) {
+  std::vector<cavc_vertex> vertexes = {
+      {2.0, 11.0, -0.6681786379192991},
+      {2.7071067811865475, 9.292893218813452, 0.0},
+      {-0.2928932188134524, 6.292893218813452, -0.6681786379192989},
+      {-2.0, 7.0, 0.0},
+      {-2.0, 15.0, -0.6681786379192989},
+      {-0.2928932188134524, 15.707106781186548, 0.0},
+      {2.7071067811865475, 12.707106781186548, -0.6681786379192991},
+  };
+  cavc_pline *pline = plineFromVertexes(vertexes, true);
+
+  cavc_parallel_offset_options options = defaultParallelOffsetOptions();
+  options.may_have_self_intersects = 1;
+
+  cavc_pline_list *results = nullptr;
+  cavc_parallel_offset(pline, 1.0, &results, options);
+
+  ASSERT_EQ(cavc_pline_list_count(results), 1u);
+  cavc_pline *resultPline = cavc_pline_list_get(results, 0);
+  PolylineProperties actual(resultPline);
+  PolylineProperties expected(7, -64.3633792727984, 31.14604709099094, -3.0, 5.0, 4.0, 17.0);
+  ASSERT_EQ(actual, expected);
+
+  cavc_pline_list_delete(results);
+  cavc_pline_delete(pline);
+}
+
 int main(int argc, char **argv) {
   t::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();

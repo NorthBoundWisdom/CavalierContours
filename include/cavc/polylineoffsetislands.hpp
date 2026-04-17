@@ -427,6 +427,25 @@ void ParallelOffsetIslands<Real>::createSlicesFromLoop(std::size_t loopIndex, Re
   OffsetLoop<Real> const &offsetLoop = getOffsetLoop(loopIndex);
   std::size_t const parentIndex = offsetLoop.parentLoopIndex;
   Polyline<Real> const &pline = offsetLoop.polyline;
+  auto sliceMidpointsValid = [&](Polyline<Real> const &slice) {
+    CAVC_ASSERT(slice.size() > 1, "slice must contain at least one segment");
+
+    auto midpointValid = [&](std::size_t startIndex) {
+      auto midpoint = segMidpoint(slice[startIndex], slice[startIndex + 1]);
+      return pointOnOffsetValid(parentIndex, midpoint, absDelta);
+    };
+
+    // Avoid validating only against a segment created directly by intersection points. If an
+    // interior segment exists, prefer that midpoint; otherwise validate both edge segments.
+    if (slice.size() > 3) {
+      return midpointValid(1);
+    }
+    if (slice.size() == 3) {
+      return midpointValid(0) && midpointValid(1);
+    }
+    return midpointValid(0);
+  };
+
   m_loopDissectionPoints.clear();
   for (auto const &setIndex : m_slicePointsLookup[loopIndex]) {
     auto const &set = m_slicePointSets[setIndex];
@@ -536,9 +555,7 @@ void ParallelOffsetIslands<Real>::createSlicesFromLoop(std::size_t loopIndex, Re
     }
 
     if (currSlice.pline.size() > 1) {
-      auto sMidpoint =
-          segMidpoint(currSlice.pline[currSlice.pline.size() - 2], currSlice.pline.lastVertex());
-      if (!pointOnOffsetValid(parentIndex, sMidpoint, absDelta)) {
+      if (!sliceMidpointsValid(currSlice.pline)) {
         // skip slice
         continue;
       }

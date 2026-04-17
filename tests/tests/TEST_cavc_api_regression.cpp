@@ -427,6 +427,31 @@ TEST(CApiRegression, ParallelOffsetMiterJoinSupportsArcInvolvedJoins) {
   EXPECT_TRUE(has_arc_segment);
 }
 
+TEST(CApiRegression, ArcArcOpposingDirectionTouchAtEndsReturnsSharedEndpoint) {
+  using Vertex = cavc::PlineVertex<cavc_real>;
+  using Point = cavc::Vector2<cavc_real>;
+
+  auto expect_single_intersection = [](Vertex const &a1, Vertex const &a2, Vertex const &b1,
+                                       Vertex const &b2, Point const &expected) {
+    auto const result = cavc::intrPlineSegs(a1, a2, b1, b2);
+    ASSERT_EQ(result.intrType, cavc::PlineSegIntrType::OneIntersect);
+    EXPECT_TRUE(cavc::fuzzyEqual(result.point1, expected, cavc_real(1e-9)));
+  };
+
+  Vertex const v1(-189.0, -196.91384910249, 0.553407781718062);
+  Vertex const v2(-170.999999999999, -225.631646989572, -0.553407781718061);
+  Vertex const u1(-153.0, -196.91384910249, -0.553407781718061);
+  Vertex const u2(-171.0, -225.631646989571, -0.553407781718061);
+  Point const expected(-171.0, -225.631646989571);
+
+  expect_single_intersection(v1, v2, u1, u2, expected);
+  expect_single_intersection(u1, u2, v1, v2, expected);
+
+  Vertex const reversed_u1(-171.0, -225.631646989571, 0.553407781718062);
+  Vertex const reversed_u2(-153.0, -196.91384910249, -0.553407781718061);
+  expect_single_intersection(v1, v2, reversed_u1, reversed_u2, expected);
+}
+
 TEST(CApiRegression, ParallelOffsetArcInvolvedMiterLimitCanForceBevelEquivalentResult) {
   std::vector<cavc_vertex> arc_join_shape = {
       {0.0, 0.0, 0.0}, {4.0, 0.0, 0.5}, {8.0, 0.0, 0.0}, {8.0, 4.0, 0.0}, {0.0, 4.0, 0.0}};

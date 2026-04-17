@@ -10,6 +10,7 @@ install
 *.qm
 .vscode
 .clangd
+Downloads
 
 package
 dist

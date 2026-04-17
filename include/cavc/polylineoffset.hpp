@@ -1565,8 +1565,8 @@ stitchOffsetSlicesTogether(std::vector<OpenPolylineSlice<Real>> const &slices, b
           indexDist = origMaxIndex - currLoopStartIndex + slice.intrStartIndex;
         }
 
-        bool equalToInitial = fuzzyEqual(slice.pline.lastVertex().pos(), initialStartPoint,
-                                         utils::realPrecision<Real>());
+        bool equalToInitial =
+            fuzzyEqual(slice.pline.lastVertex().pos(), initialStartPoint, joinThreshold);
 
         return std::make_pair(indexDist, equalToInitial);
       };
@@ -1587,8 +1587,8 @@ stitchOffsetSlicesTogether(std::vector<OpenPolylineSlice<Real>> const &slices, b
       if (queryResults.size() == 0) {
         // we're done
         if (currPline.size() > 1) {
-          if (closedPolyline && fuzzyEqual(currPline[0].pos(), currPline.lastVertex().pos(),
-                                           utils::realPrecision<Real>())) {
+          if (closedPolyline &&
+              fuzzyEqual(currPline[0].pos(), currPline.lastVertex().pos(), joinThreshold)) {
             currPline.vertexes().pop_back();
             currPline.isClosed() = true;
           }
