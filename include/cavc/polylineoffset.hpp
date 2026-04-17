@@ -805,6 +805,88 @@ bool pointValidForOffset(Polyline<Real> const &pline, Real offset,
   return pointValid;
 }
 
+template <typename Real>
+Real slicePathLength(Polyline<Real> const &source, PlineSliceViewData<Real> const &slice) {
+  Real result = Real(0);
+  slice.visitSegments(source, [&](PlineVertex<Real> const &v1, PlineVertex<Real> const &v2) {
+    result += segLength(v1, v2);
+    return true;
+  });
+  return result;
+}
+
+template <typename Real> struct PointPairHash {
+  std::size_t operator()(std::pair<Real, Real> const &value) const noexcept {
+    std::size_t seed = std::hash<Real>{}(value.first);
+    std::size_t hash2 = std::hash<Real>{}(value.second);
+    return seed ^ (hash2 + 0x9e3779b9u + (seed << 6) + (seed >> 2));
+  }
+};
+
+template <typename Real, typename PointValidF, typename PointValidAtRawIndexF,
+          typename SegmentIntersectsF, typename RawSegmentIntersectsF>
+bool offsetSliceIsValid(Polyline<Real> const &rawOffsetPline, PlineSliceViewData<Real> const &slice,
+                        PointValidF &&pointValid, PointValidAtRawIndexF &&pointValidAtRawIndex,
+                        SegmentIntersectsF &&segmentIntersectsOrig,
+                        RawSegmentIntersectsF &&rawSegmentIntersectsOrig) {
+  if (slice.endIndexOffset == 0) {
+    PlineVertex<Real> const &sliceStart = slice.updatedStart;
+    PlineVertex<Real> sliceEnd(slice.endPoint, Real(0));
+    if (!pointValid(sliceStart.pos()) || !pointValid(sliceEnd.pos())) {
+      return false;
+    }
+
+    Vector2<Real> midpoint = segMidpoint(sliceStart, sliceEnd);
+    return pointValid(midpoint) && !segmentIntersectsOrig(sliceStart, sliceEnd);
+  }
+
+  std::size_t const nextIndex = utils::nextWrappingIndex(slice.startIndex, rawOffsetPline);
+  Vector2<Real> startSegMidpoint = segMidpoint(slice.updatedStart, rawOffsetPline[nextIndex]);
+  if (!pointValid(startSegMidpoint)) {
+    return false;
+  }
+
+  std::size_t endIndex = slice.startIndex + slice.endIndexOffset;
+  if (endIndex >= rawOffsetPline.size()) {
+    endIndex -= rawOffsetPline.size();
+  }
+  PlineVertex<Real> endSegStart = rawOffsetPline[endIndex];
+  endSegStart.bulge() = slice.updatedEndBulge;
+  Vector2<Real> endSegMidpoint = segMidpoint(endSegStart, PlineVertex<Real>(slice.endPoint, Real(0)));
+  if (!pointValid(endSegMidpoint)) {
+    return false;
+  }
+
+  Real const posEqualEps = utils::realPrecision<Real>();
+  bool const startIsRawVertex =
+      fuzzyEqual(slice.updatedStart.pos(), rawOffsetPline[slice.startIndex].pos(), posEqualEps);
+  bool const startPointValid =
+      startIsRawVertex ? pointValidAtRawIndex(slice.startIndex) : pointValid(slice.updatedStart.pos());
+  bool const startSegIntersectsOrig =
+      startIsRawVertex && utils::fuzzyEqual(slice.updatedStart.bulge(),
+                                            rawOffsetPline[slice.startIndex].bulge(), posEqualEps)
+          ? rawSegmentIntersectsOrig(slice.startIndex)
+          : segmentIntersectsOrig(slice.updatedStart, rawOffsetPline[nextIndex]);
+
+  if (!startPointValid || startSegIntersectsOrig) {
+    return false;
+  }
+
+  std::size_t segIndex = nextIndex;
+  for (std::size_t i = 1; i < slice.endIndexOffset; ++i) {
+    if (!pointValidAtRawIndex(segIndex) || rawSegmentIntersectsOrig(segIndex)) {
+      return false;
+    }
+    segIndex = utils::nextWrappingIndex(segIndex, rawOffsetPline);
+  }
+
+  if (!pointValidAtRawIndex(endIndex) || segmentIntersectsOrig(endSegStart, {slice.endPoint, Real(0)})) {
+    return false;
+  }
+
+  return pointValid(slice.endPoint);
+}
+
 /// Creates the raw offset polyline.
 template <typename Real>
 Polyline<Real> createRawOffsetPline(Polyline<Real> const &pline, Real offset,
@@ -970,15 +1052,44 @@ slicesFromRawOffset(Polyline<Real> const &originalPline, Polyline<Real> const &r
 
   std::vector<std::size_t> queryStack;
   queryStack.reserve(8);
+  std::unordered_map<std::pair<Real, Real>, std::uint8_t, PointPairHash<Real>>
+      intersectPointValidCache;
+  if (selfIntersects.size() != 0) {
+    intersectPointValidCache.reserve(2 * selfIntersects.size());
+  }
+  std::vector<std::int8_t> rawVertexPointValidCache(rawOffsetPline.size(), -1);
+  std::vector<std::int8_t> rawSegmentIntersectsOrigCache(rawOffsetPline.size(), -1);
   auto pointValid = [&](Vector2<Real> const &p) {
     if (!enforceMinDistance) {
       return true;
     }
+
     return pointValidForOffset(originalPline, offset, origPlineSpatialIndex, p, queryStack);
+  };
+  auto intersectPointValid = [&](Vector2<Real> const &p) {
+    auto const key = std::make_pair(p.x(), p.y());
+    auto const iter = intersectPointValidCache.find(key);
+    if (iter != intersectPointValidCache.end()) {
+      return iter->second != 0;
+    }
+
+    bool const valid = pointValid(p);
+    intersectPointValidCache.emplace(key, valid ? 1 : 0);
+    return valid;
+  };
+  auto pointValidAtRawIndex = [&](std::size_t index) {
+    std::int8_t &cached = rawVertexPointValidCache[index];
+    if (cached != -1) {
+      return cached != 0;
+    }
+
+    bool const valid = pointValid(rawOffsetPline[index].pos());
+    cached = valid ? 1 : 0;
+    return valid;
   };
 
   if (selfIntersects.size() == 0) {
-    if (!pointValid(rawOffsetPline[0].pos())) {
+    if (!pointValidAtRawIndex(0)) {
       return result;
     }
     result.push_back(
@@ -1027,6 +1138,27 @@ slicesFromRawOffset(Polyline<Real> const &originalPline, Polyline<Real> const &r
                                      visitor, queryStack);
 
     return hasIntersect;
+  };
+  auto rawSegmentIntersectsOrig = [&](std::size_t index) {
+    std::int8_t &cached = rawSegmentIntersectsOrigCache[index];
+    if (cached != -1) {
+      return cached != 0;
+    }
+
+    std::size_t const nextIndex = utils::nextWrappingIndex(index, rawOffsetPline);
+    bool const intersects = intersectsOrigPline(rawOffsetPline[index], rawOffsetPline[nextIndex]);
+    cached = intersects ? 1 : 0;
+    return intersects;
+  };
+  auto rawVertexSegmentIntersectsOrig = [&](PlineVertex<Real> const &v1, std::size_t endIndex) {
+    std::size_t prevIndex = utils::prevWrappingIndex(endIndex, rawOffsetPline);
+    if (fuzzyEqual(v1.pos(), rawOffsetPline[prevIndex].pos(), utils::realPrecision<Real>()) &&
+        utils::fuzzyEqual(v1.bulge(), rawOffsetPline[prevIndex].bulge(),
+                          utils::realPrecision<Real>())) {
+      return rawSegmentIntersectsOrig(prevIndex);
+    }
+
+    return intersectsOrigPline(v1, rawOffsetPline[endIndex]);
   };
 
   for (auto const &kvp : intersectsLookup) {
@@ -1084,7 +1216,7 @@ slicesFromRawOffset(Polyline<Real> const &originalPline, Polyline<Real> const &r
     }
 
     std::size_t index = nextIndex;
-    bool isValidSlice = pointValid(siList.back());
+    bool isValidSlice = intersectPointValid(siList.back());
     SplitResult<Real> sliceStartSplit = splitAtPoint(startVertex, endVertex, siList.back());
     PlineVertex<Real> currLastVertex = sliceStartSplit.splitVertex;
     std::size_t vertexCount = 1;
@@ -1095,8 +1227,7 @@ slicesFromRawOffset(Polyline<Real> const &originalPline, Polyline<Real> const &r
         CAVC_ASSERT(false, "Bug detected, should never loop this many times!");
         break;
       }
-      if (!pointValid(rawOffsetPline[index].pos()) ||
-          intersectsOrigPline(currLastVertex, rawOffsetPline[index])) {
+      if (!pointValidAtRawIndex(index) || rawVertexSegmentIntersectsOrig(currLastVertex, index)) {
         isValidSlice = false;
         break;
       }
@@ -1112,7 +1243,7 @@ slicesFromRawOffset(Polyline<Real> const &originalPline, Polyline<Real> const &r
       auto nextIntr = intersectsLookup.find(index);
       if (nextIntr != intersectsLookup.end()) {
         Vector2<Real> const &intersectPos = nextIntr->second[0];
-        if (!pointValid(intersectPos)) {
+        if (!intersectPointValid(intersectPos)) {
           isValidSlice = false;
           break;
         }
@@ -1131,10 +1262,11 @@ slicesFromRawOffset(Polyline<Real> const &originalPline, Polyline<Real> const &r
         if (isValidSlice && slice) {
           if (vertexCount > 1 &&
               fuzzyEqual(slice->firstPoint(rawOffsetPline), slice->lastPoint(rawOffsetPline),
-                         utils::realPrecision<Real>())) {
-            Polyline<Real> candidate = slice->toPolyline(rawOffsetPline);
-            isValidSlice = getPathLength(candidate) > Real(1e-2);
+                         utils::realPrecision<Real>()) &&
+              slicePathLength(rawOffsetPline, *slice) <= Real(1e-2)) {
+            isValidSlice = false;
           }
+
           if (isValidSlice) {
             result.push_back({sIndex, *slice});
           }
@@ -1174,8 +1306,15 @@ dualSliceAtIntersectsForOffset(Polyline<Real> const &originalPline,
   // together, because slices may not all form closed loops/polylines so must go in order of
   // indexes to ensure longest sitched results are formed)
   std::map<std::size_t, std::vector<Vector2<Real>>> intersectsLookup;
+  auto addIntersect = [&](std::size_t sIndex, Vector2<Real> const &pos) {
+    intersectsLookup[sIndex].push_back(pos);
+  };
   std::vector<std::size_t> queryStack;
   queryStack.reserve(8);
+  std::unordered_map<std::pair<Real, Real>, std::uint8_t, PointPairHash<Real>>
+      intersectPointValidCache;
+  std::vector<std::int8_t> rawVertexPointValidCache(rawOffsetPline.size(), -1);
+  std::vector<std::int8_t> rawSegmentIntersectsOrigCache(rawOffsetPline.size(), -1);
   // Keep open-polyline clipping conservative to avoid fragment loss around caps and near-tangent
   // turns. Relaxation is only allowed for closed, non-round join handling.
   const bool enforceMinDistance =
@@ -1184,15 +1323,36 @@ dualSliceAtIntersectsForOffset(Polyline<Real> const &originalPline,
     if (!enforceMinDistance) {
       return true;
     }
+    if (!originalPline.isClosed()) {
+      auto const key = std::make_pair(p.x(), p.y());
+      auto const iter = intersectPointValidCache.find(key);
+      if (iter != intersectPointValidCache.end()) {
+        return iter->second != 0;
+      }
+
+      bool const valid =
+          pointValidForOffset(originalPline, offset, origPlineSpatialIndex, p, queryStack);
+      intersectPointValidCache.emplace(key, valid ? 1 : 0);
+      return valid;
+    }
+
     return pointValidForOffset(originalPline, offset, origPlineSpatialIndex, p, queryStack);
   };
-  auto sliceEndIndex = [&](PlineSliceViewData<Real> const &slice) {
-    std::size_t sum = slice.startIndex + slice.endIndexOffset;
-    if (sum < rawOffsetPline.size()) {
-      return sum;
+  auto pointValidAtRawIndex = [&](std::size_t index) {
+    std::int8_t &cached = rawVertexPointValidCache[index];
+    if (cached != -1) {
+      return cached != 0;
     }
-    return sum - rawOffsetPline.size();
+
+    bool const valid = pointValid(rawOffsetPline[index].pos());
+    cached = valid ? 1 : 0;
+    return valid;
   };
+  if (!originalPline.isClosed()) {
+    intersectPointValidCache.reserve(2 * selfIntersects.size() + dualIntersects.intersects.size() +
+                                     2 * dualIntersects.coincidentIntersects.size() +
+                                     rawOffsetPline.size());
+  }
 
   if (!originalPline.isClosed()) {
     // find intersects between raw offset polyline and end-cap clip geometry
@@ -1220,26 +1380,26 @@ dualSliceAtIntersectsForOffset(Polyline<Real> const &originalPline,
                                                 circleQueryResults, queryStack);
     }
     for (auto const &pair : intersects) {
-      intersectsLookup[pair.first].push_back(pair.second);
+      addIntersect(pair.first, pair.second);
     }
   }
 
   for (PlineIntersect<Real> const &si : selfIntersects) {
-    intersectsLookup[si.sIndex1].push_back(si.pos);
-    intersectsLookup[si.sIndex2].push_back(si.pos);
+    addIntersect(si.sIndex1, si.pos);
+    addIntersect(si.sIndex2, si.pos);
   }
 
   for (PlineIntersect<Real> const &intr : dualIntersects.intersects) {
-    intersectsLookup[intr.sIndex1].push_back(intr.pos);
+    addIntersect(intr.sIndex1, intr.pos);
   }
 
   for (PlineCoincidentIntersect<Real> const &intr : dualIntersects.coincidentIntersects) {
-    intersectsLookup[intr.sIndex1].push_back(intr.point1);
-    intersectsLookup[intr.sIndex1].push_back(intr.point2);
+    addIntersect(intr.sIndex1, intr.point1);
+    addIntersect(intr.sIndex1, intr.point2);
   }
 
   if (intersectsLookup.size() == 0) {
-    if (!pointValid(rawOffsetPline[0].pos())) {
+    if (!pointValidAtRawIndex(0)) {
       return result;
     }
     result.push_back(
@@ -1273,66 +1433,39 @@ dualSliceAtIntersectsForOffset(Polyline<Real> const &originalPline,
 
     return intersects;
   };
+  auto rawSegmentIntersectsOrig = [&](std::size_t index) {
+    std::int8_t &cached = rawSegmentIntersectsOrigCache[index];
+    if (cached != -1) {
+      return cached != 0;
+    }
+
+    std::size_t const nextIndex = utils::nextWrappingIndex(index, rawOffsetPline);
+    bool const intersects = intersectsOrigPline(rawOffsetPline[index], rawOffsetPline[nextIndex]);
+    cached = intersects ? 1 : 0;
+    return intersects;
+  };
 
   auto sliceIsValid = [&](PlineSliceViewData<Real> const &slice) {
-    if (slice.endIndexOffset == 0) {
-      PlineVertex<Real> sliceEndVertex(slice.endPoint, Real(0));
-      if (!pointValid(slice.updatedStart.pos()) || !pointValid(sliceEndVertex.pos())) {
-        return false;
-      }
-
-      Vector2<Real> midpoint = segMidpoint(slice.updatedStart, sliceEndVertex);
-      return pointValid(midpoint) && !intersectsOrigPline(slice.updatedStart, sliceEndVertex);
+    return offsetSliceIsValid(rawOffsetPline, slice, pointValid, pointValidAtRawIndex,
+                              intersectsOrigPline, rawSegmentIntersectsOrig);
+  };
+  auto maybeAppendSlice = [&](std::size_t sIndex,
+                              std::optional<PlineSliceViewData<Real>> const &slice) {
+    if (!slice || !sliceIsValid(*slice)) {
+      return;
     }
 
-    std::size_t nextIndex = utils::nextWrappingIndex(slice.startIndex, rawOffsetPline);
-    Vector2<Real> startSegMidpoint = segMidpoint(slice.updatedStart, rawOffsetPline[nextIndex]);
-    if (!pointValid(startSegMidpoint)) {
-      return false;
-    }
-
-    std::size_t endIndex = sliceEndIndex(slice);
-    PlineVertex<Real> endSegStart = rawOffsetPline[endIndex];
-    endSegStart.bulge() = slice.updatedEndBulge;
-    Vector2<Real> endSegMidpoint = segMidpoint(endSegStart, PlineVertex<Real>(slice.endPoint, Real(0)));
-    if (!pointValid(endSegMidpoint)) {
-      return false;
-    }
-
-    bool valid = true;
-    slice.visitSegments(rawOffsetPline, [&](PlineVertex<Real> const &v1, PlineVertex<Real> const &v2) {
-      if (!pointValid(v1.pos()) || intersectsOrigPline(v1, v2)) {
-        valid = false;
-        return false;
-      }
-      return true;
-    });
-
-    return valid && pointValid(slice.endPoint);
+    result.push_back({sIndex, *slice});
   };
 
   if (!originalPline.isClosed()) {
     // build first open polyline that ends at the first intersect since we will not wrap back to
     // capture it as in the case of a closed polyline
-    std::size_t index = 0;
-    std::size_t loopCount = 0;
-    const std::size_t maxLoopCount = rawOffsetPline.size();
-    while (true) {
-      if (loopCount++ > maxLoopCount) {
-        CAVC_ASSERT(false, "Bug detected, should never loop this many times!");
-        break;
-      }
-      auto iter = intersectsLookup.find(index);
-      if (iter == intersectsLookup.end()) {
-        index += 1;
-      } else {
-        auto slice = PlineSliceViewData<Real>::createFromSlicePoints(
-            rawOffsetPline, rawOffsetPline[0].pos(), 0, iter->second[0], index);
-        if (slice && sliceIsValid(*slice)) {
-          result.push_back({0, *slice});
-        }
-        break;
-      }
+    auto iter = intersectsLookup.begin();
+    if (iter != intersectsLookup.end()) {
+      auto slice = PlineSliceViewData<Real>::createFromSlicePoints(
+          rawOffsetPline, rawOffsetPline[0].pos(), 0, iter->second[0], iter->first);
+      maybeAppendSlice(0, slice);
     }
   }
 
@@ -1384,9 +1517,7 @@ dualSliceAtIntersectsForOffset(Polyline<Real> const &originalPline,
 
         auto slice = PlineSliceViewData<Real>::createOnSingleSegment(
             rawOffsetPline, sIndex, split.updatedStart, split.splitVertex.pos());
-        if (slice && sliceIsValid(*slice)) {
-          result.push_back({sIndex, *slice});
-        }
+        maybeAppendSlice(sIndex, slice);
       }
     }
 
@@ -1394,9 +1525,7 @@ dualSliceAtIntersectsForOffset(Polyline<Real> const &originalPline,
     if (nextIntr != intersectsLookup.end()) {
       auto slice = PlineSliceViewData<Real>::createFromSlicePoints(
           rawOffsetPline, siList.back(), sIndex, nextIntr->second[0], nextIntr->first);
-      if (slice && sliceIsValid(*slice)) {
-        result.push_back({sIndex, *slice});
-      }
+      maybeAppendSlice(sIndex, slice);
       continue;
     }
 
@@ -1405,9 +1534,7 @@ dualSliceAtIntersectsForOffset(Polyline<Real> const &originalPline,
       if (wrapIntr != intersectsLookup.end()) {
         auto slice = PlineSliceViewData<Real>::createFromSlicePoints(
             rawOffsetPline, siList.back(), sIndex, wrapIntr->second[0], wrapIntr->first);
-        if (slice && sliceIsValid(*slice)) {
-          result.push_back({sIndex, *slice});
-        }
+        maybeAppendSlice(sIndex, slice);
       }
       continue;
     }
@@ -1415,9 +1542,7 @@ dualSliceAtIntersectsForOffset(Polyline<Real> const &originalPline,
     auto tailSlice = PlineSliceViewData<Real>::createFromSlicePoints(
         rawOffsetPline, siList.back(), sIndex, rawOffsetPline.lastVertex().pos(),
         rawOffsetPline.size() - 1);
-    if (tailSlice && sliceIsValid(*tailSlice)) {
-      result.push_back({sIndex, *tailSlice});
-    }
+    maybeAppendSlice(sIndex, tailSlice);
   }
 
   return result;
@@ -1448,9 +1573,14 @@ stitchOffsetSlicesTogether(Polyline<Real> const &sourcePline,
 
   // load spatial index with all start points
   StaticSpatialIndex<Real> spatialIndex(slices.size());
+  std::vector<Vector2<Real>> sliceStartPoints(slices.size());
+  std::vector<Vector2<Real>> sliceEndPoints(slices.size());
 
-  for (const auto &slice : slices) {
-    auto const &point = slice.viewData.firstPoint(sourcePline);
+  for (std::size_t i = 0; i < slices.size(); ++i) {
+    auto const &slice = slices[i];
+    auto const point = slice.viewData.firstPoint(sourcePline);
+    sliceStartPoints[i] = point;
+    sliceEndPoints[i] = slice.viewData.lastPoint(sourcePline);
     spatialIndex.add(point.x() - joinThreshold, point.y() - joinThreshold,
                      point.x() + joinThreshold, point.y() + joinThreshold);
   }
@@ -1471,7 +1601,7 @@ stitchOffsetSlicesTogether(Polyline<Real> const &sourcePline,
 
     Polyline<Real> currPline;
     std::size_t currIndex = i;
-    auto const &initialStartPoint = slices[i].viewData.firstPoint(sourcePline);
+    auto const &initialStartPoint = sliceStartPoints[i];
     std::size_t loopCount = 0;
     const std::size_t maxLoopCount = slices.size();
     while (true) {
@@ -1482,7 +1612,7 @@ stitchOffsetSlicesTogether(Polyline<Real> const &sourcePline,
       }
       const std::size_t currLoopStartIndex = slices[currIndex].intrStartIndex;
       auto const &currSlice = slices[currIndex].viewData;
-      auto const &currEndPoint = currSlice.lastPoint(sourcePline);
+      auto const &currEndPoint = sliceEndPoints[currIndex];
       currSlice.appendTo(currPline, sourcePline, joinThreshold);
       queryResults.clear();
       auto queryVisitor = [&](std::size_t index) {
@@ -1506,7 +1636,7 @@ stitchOffsetSlicesTogether(Polyline<Real> const &sourcePline,
         }
 
         bool equalToInitial =
-            fuzzyEqual(slice.viewData.lastPoint(sourcePline), initialStartPoint, joinThreshold);
+            fuzzyEqual(sliceEndPoints[index], initialStartPoint, joinThreshold);
 
         return std::make_pair(indexDist, equalToInitial);
       };
