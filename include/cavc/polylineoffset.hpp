@@ -1,6 +1,7 @@
 #ifndef CAVC_POLYLINEOFFSET_HPP
 #define CAVC_POLYLINEOFFSET_HPP
 #include <algorithm>
+#include <cstdint>
 #include <functional>
 
 #include "polyline.hpp"
@@ -1530,16 +1531,17 @@ stitchOffsetSlicesTogether(std::vector<OpenPolylineSlice<Real>> const &slices, b
 
   spatialIndex.finish();
 
-  std::vector<bool> visitedIndexes(slices.size(), false);
+  std::vector<std::uint8_t> visitedIndexes(slices.size(), 0);
   std::vector<std::size_t> queryResults;
+  queryResults.reserve(8);
   std::vector<std::size_t> queryStack;
   queryStack.reserve(8);
   for (std::size_t i = 0; i < slices.size(); ++i) {
-    if (visitedIndexes[i]) {
+    if (visitedIndexes[i] != 0) {
       continue;
     }
 
-    visitedIndexes[i] = true;
+    visitedIndexes[i] = 1;
 
     Polyline<Real> currPline;
     std::size_t currIndex = i;
@@ -1558,13 +1560,15 @@ stitchOffsetSlicesTogether(std::vector<OpenPolylineSlice<Real>> const &slices, b
       currPline.vertexes().insert(currPline.vertexes().end(), currSlice.vertexes().begin(),
                                   currSlice.vertexes().end());
       queryResults.clear();
-      spatialIndex.query(currEndPoint.x() - joinThreshold, currEndPoint.y() - joinThreshold,
-                         currEndPoint.x() + joinThreshold, currEndPoint.y() + joinThreshold,
-                         queryResults, queryStack);
-
-      queryResults.erase(std::remove_if(queryResults.begin(), queryResults.end(),
-                                        [&](std::size_t index) { return visitedIndexes[index]; }),
-                         queryResults.end());
+      auto queryVisitor = [&](std::size_t index) {
+        if (visitedIndexes[index] == 0) {
+          queryResults.push_back(index);
+        }
+        return true;
+      };
+      spatialIndex.visitQuery(currEndPoint.x() - joinThreshold, currEndPoint.y() - joinThreshold,
+                              currEndPoint.x() + joinThreshold, currEndPoint.y() + joinThreshold,
+                              queryVisitor, queryStack);
 
       auto indexDistAndEqualInitial = [&](std::size_t index) {
         auto const &slice = slices[index];
@@ -1609,7 +1613,7 @@ stitchOffsetSlicesTogether(std::vector<OpenPolylineSlice<Real>> const &slices, b
       }
 
       // else continue stitching
-      visitedIndexes[queryResults[0]] = true;
+      visitedIndexes[queryResults[0]] = 1;
       currPline.vertexes().pop_back();
       currIndex = queryResults[0];
     }
@@ -1746,17 +1750,22 @@ stitchSlicesIntoSimpleClosedLoops(std::vector<OpenPolylineSlice<Real>> const &sl
 
   std::vector<std::vector<std::size_t>> nextIndexes(slices.size());
   std::vector<std::size_t> queryResults;
+  queryResults.reserve(8);
   std::vector<std::size_t> queryStack;
   queryStack.reserve(8);
 
   for (std::size_t i = 0; i < slices.size(); ++i) {
     auto const &currEndPoint = slices[i].pline.lastVertex().pos();
     queryResults.clear();
-    spatialIndex.query(currEndPoint.x() - joinThreshold, currEndPoint.y() - joinThreshold,
-                       currEndPoint.x() + joinThreshold, currEndPoint.y() + joinThreshold,
-                       queryResults, queryStack);
-
-    queryResults.erase(std::remove(queryResults.begin(), queryResults.end(), i), queryResults.end());
+    auto queryVisitor = [&](std::size_t index) {
+      if (index != i) {
+        queryResults.push_back(index);
+      }
+      return true;
+    };
+    spatialIndex.visitQuery(currEndPoint.x() - joinThreshold, currEndPoint.y() - joinThreshold,
+                            currEndPoint.x() + joinThreshold, currEndPoint.y() + joinThreshold,
+                            queryVisitor, queryStack);
     std::sort(queryResults.begin(), queryResults.end(),
               [&](std::size_t left, std::size_t right) {
                 std::size_t const leftDist = forwardDistance(i, left);
@@ -1772,14 +1781,13 @@ stitchSlicesIntoSimpleClosedLoops(std::vector<OpenPolylineSlice<Real>> const &sl
     nextIndexes[i] = std::move(queryResults);
   }
 
-  std::vector<bool> usedIndexes(slices.size(), false);
-  std::vector<bool> localUsed(slices.size(), false);
+  std::vector<std::uint8_t> usedIndexes(slices.size(), 0);
+  std::vector<std::uint8_t> localUsed(slices.size(), 0);
   std::vector<std::size_t> path;
   std::vector<std::size_t> acceptedPath;
   Polyline<Real> acceptedLoop;
 
-  std::function<bool(std::size_t, Polyline<Real> const &)> dfs =
-      [&](std::size_t currIndex, Polyline<Real> const &currPline) {
+  auto dfs = [&](auto &&self, std::size_t currIndex, Polyline<Real> const &currPline) -> bool {
         if (currPline.size() > 2 &&
             fuzzyEqual(currPline[0].pos(), currPline.lastVertex().pos(), joinThreshold)) {
           Polyline<Real> closedLoop = currPline;
@@ -1793,7 +1801,7 @@ stitchSlicesIntoSimpleClosedLoops(std::vector<OpenPolylineSlice<Real>> const &sl
         }
 
         for (std::size_t nextIndex : nextIndexes[currIndex]) {
-          if (usedIndexes[nextIndex] || localUsed[nextIndex]) {
+          if (usedIndexes[nextIndex] != 0 || localUsed[nextIndex] != 0) {
             continue;
           }
 
@@ -1803,33 +1811,33 @@ stitchSlicesIntoSimpleClosedLoops(std::vector<OpenPolylineSlice<Real>> const &sl
                                       slices[nextIndex].pline.vertexes().begin(),
                                       slices[nextIndex].pline.vertexes().end());
 
-          localUsed[nextIndex] = true;
+          localUsed[nextIndex] = 1;
           path.push_back(nextIndex);
-          if (dfs(nextIndex, nextPline)) {
+          if (self(self, nextIndex, nextPline)) {
             return true;
           }
           path.pop_back();
-          localUsed[nextIndex] = false;
+          localUsed[nextIndex] = 0;
         }
 
         return false;
       };
 
   for (std::size_t i = 0; i < slices.size(); ++i) {
-    if (usedIndexes[i]) {
+    if (usedIndexes[i] != 0) {
       continue;
     }
 
     path.clear();
     path.push_back(i);
     std::fill(localUsed.begin(), localUsed.end(), false);
-    localUsed[i] = true;
+    localUsed[i] = 1;
     acceptedPath.clear();
     acceptedLoop = Polyline<Real>();
 
-    if (dfs(i, slices[i].pline)) {
+    if (dfs(dfs, i, slices[i].pline)) {
       for (std::size_t index : acceptedPath) {
-        usedIndexes[index] = true;
+        usedIndexes[index] = 1;
       }
       result.emplace_back(std::move(acceptedLoop));
     }

@@ -98,6 +98,9 @@ template <typename Real> AABB<Real> getExtents(Polyline<Real> const &pline) {
       result.yMax = p.y();
   };
 
+  constexpr Real cardinalAngles[] = {Real(0), Real(0.5) * utils::pi<Real>(), utils::pi<Real>(),
+                                      Real(1.5) * utils::pi<Real>()};
+
   auto visitor = [&](std::size_t i, std::size_t j) {
     PlineVertex<Real> const &v1 = pline[i];
     PlineVertex<Real> const &v2 = pline[j];
@@ -109,13 +112,19 @@ template <typename Real> AABB<Real> getExtents(Polyline<Real> const &pline) {
       // line segment or degenerate arc, endpoints already accounted for
     } else {
       auto arc = arcRadiusAndCenter(v1, v2);
-      constexpr Real cardinalAngles[] = {Real(0), Real(0.5) * utils::pi<Real>(),
-                                         utils::pi<Real>(), Real(1.5) * utils::pi<Real>()};
+      Real startAngle = utils::normalizeRadians(angle(arc.center, v1.pos()));
+      Real endAngle = utils::normalizeRadians(angle(arc.center, v2.pos()));
+      Real sweepAngle = utils::deltaAngle(startAngle, endAngle);
+      if (v1.bulgeIsNeg() && sweepAngle > Real(0)) {
+        sweepAngle -= utils::tau<Real>();
+      } else if (v1.bulgeIsPos() && sweepAngle < Real(0)) {
+        sweepAngle += utils::tau<Real>();
+      }
 
       for (Real angleValue : cardinalAngles) {
-        Vector2<Real> arcPoint = pointOnCircle(arc.radius, arc.center, angleValue);
-        if (pointWithinArcSweepAngle(arc.center, v1.pos(), v2.pos(), v1.bulge(), arcPoint,
-                                     utils::realPrecision<Real>())) {
+        if (utils::angleIsWithinSweep(startAngle, sweepAngle, angleValue,
+                                      utils::realPrecision<Real>())) {
+          Vector2<Real> arcPoint = pointOnCircle(arc.radius, arc.center, angleValue);
           updateWithPoint(arcPoint);
         }
       }
@@ -146,21 +155,22 @@ template <typename Real> Real getArea(Polyline<Real> const &pline) {
   }
 
   Real doubleAreaTotal = Real(0);
-
-  auto visitor = [&](std::size_t i, std::size_t j) {
-    Real doubleArea = pline[i].x() * pline[j].y() - pline[i].y() * pline[j].x();
-    if (!pline[i].bulgeIsZero()) {
+  for (std::size_t i = 0, j = pline.size() - 1; i < pline.size(); j = i++) {
+    PlineVertex<Real> const &v1 = pline[j];
+    PlineVertex<Real> const &v2 = pline[i];
+    Real doubleArea = v1.x() * v2.y() - v1.y() * v2.x();
+    if (!v1.bulgeIsZero()) {
       // add arc segment area
-      Real b = std::abs(pline[i].bulge());
+      Real b = std::abs(v1.bulge());
       Real sweepAngle = Real(4) * std::atan(b);
-      Real triangleBase = length(pline[j].pos() - pline[i].pos());
+      Real triangleBase = length(v2.pos() - v1.pos());
       Real radius = triangleBase * (b * b + Real(1)) / (Real(4) * b);
       Real sagitta = b * triangleBase / Real(2);
       Real triangleHeight = radius - sagitta;
       Real doubleSectorArea = sweepAngle * radius * radius;
       Real doubleTriangleArea = triangleBase * triangleHeight;
       Real doubleArcSegArea = doubleSectorArea - doubleTriangleArea;
-      if (pline[i].bulgeIsNeg()) {
+      if (v1.bulgeIsNeg()) {
         doubleArcSegArea = -doubleArcSegArea;
       }
 
@@ -168,12 +178,7 @@ template <typename Real> Real getArea(Polyline<Real> const &pline) {
     }
 
     doubleAreaTotal += doubleArea;
-
-    // iterate all segments
-    return true;
-  };
-
-  pline.visitSegIndices(visitor);
+  }
 
   return doubleAreaTotal / Real(2);
 }
@@ -663,26 +668,29 @@ int getWindingNumber(Polyline<Real> const &pline, Vector2<Real> const &point) {
   }
 
   int windingNumber = 0;
-
-  auto lineVisitor = [&](const auto &v1, const auto &v2) {
-    if (v1.y() <= point.y()) {
-      if (v2.y() > point.y() && isLeft(v1.pos(), v2.pos(), point))
-        // left and upward crossing
-        windingNumber += 1;
-    } else if (v2.y() <= point.y() && !(isLeft(v1.pos(), v2.pos(), point))) {
-      // right and downward crossing
-      windingNumber -= 1;
-    }
-  };
-
-  // Helper function to determine if point is inside an arc sector area
-  auto distToArcCenterLessThanRadius = [](const auto &v1, const auto &v2, const auto &pt) {
+  auto distToArcCenterLessThanRadius = [&](PlineVertex<Real> const &v1,
+                                           PlineVertex<Real> const &v2) {
     auto arc = arcRadiusAndCenter(v1, v2);
-    Real dist2 = distSquared(arc.center, pt);
+    Real dist2 = distSquared(arc.center, point);
     return dist2 < arc.radius * arc.radius;
   };
 
-  auto arcVisitor = [&](const auto &v1, const auto &v2) {
+  for (std::size_t i = 0, j = pline.size() - 1; i < pline.size(); j = i++) {
+    PlineVertex<Real> const &v1 = pline[j];
+    PlineVertex<Real> const &v2 = pline[i];
+    if (v1.bulgeIsZero()) {
+      if (v1.y() <= point.y()) {
+        if (v2.y() > point.y() && isLeft(v1.pos(), v2.pos(), point)) {
+          // left and upward crossing
+          windingNumber += 1;
+        }
+      } else if (v2.y() <= point.y() && !(isLeft(v1.pos(), v2.pos(), point))) {
+        // right and downward crossing
+        windingNumber -= 1;
+      }
+      continue;
+    }
+
     bool isCCW = v1.bulgeIsPos();
     // to robustly handle the case where point is on the chord of an x axis aligned arc we must
     // count it as left going one direction and not left going the other (similar to using <= for
@@ -697,18 +705,14 @@ int getWindingNumber(Polyline<Real> const &pline, Vector2<Real> const &point) {
           if (pointIsLeft) {
             // counter clockwise arc left of chord
             windingNumber += 1;
-          } else {
+          } else if (distToArcCenterLessThanRadius(v1, v2)) {
             // counter clockwise arc right of chord
-            if (distToArcCenterLessThanRadius(v1, v2, point)) {
-              windingNumber += 1;
-            }
+            windingNumber += 1;
           }
-        } else {
-          if (pointIsLeft) {
-            // clockwise arc left of chord
-            if (!distToArcCenterLessThanRadius(v1, v2, point)) {
-              windingNumber += 1;
-            }
+        } else if (pointIsLeft) {
+          // clockwise arc left of chord
+          if (!distToArcCenterLessThanRadius(v1, v2)) {
+            windingNumber += 1;
           }
           // else clockwise arc right of chord, no crossing
         }
@@ -716,68 +720,50 @@ int getWindingNumber(Polyline<Real> const &pline, Vector2<Real> const &point) {
         // not crossing arc chord and chord is below, check if point is inside arc sector
         if (isCCW && !pointIsLeft) {
           if (v2.x() < point.x() && point.x() < v1.x() &&
-              distToArcCenterLessThanRadius(v1, v2, point)) {
+              distToArcCenterLessThanRadius(v1, v2)) {
             windingNumber += 1;
           }
         } else if (!isCCW && pointIsLeft) {
           if (v1.x() < point.x() && point.x() < v2.x() &&
-              distToArcCenterLessThanRadius(v1, v2, point)) {
+              distToArcCenterLessThanRadius(v1, v2)) {
             windingNumber -= 1;
           }
         }
       }
-    } else {
-      if (v2.y() <= point.y()) {
-        // downward crossing of arc chord
-        if (isCCW) {
-          if (!pointIsLeft) {
-            // counter clockwise arc right of chord
-            if (!distToArcCenterLessThanRadius(v1, v2, point)) {
-              windingNumber -= 1;
-            }
-          }
-          // else counter clockwise arc left of chord, no crossing
-        } else {
-          if (pointIsLeft) {
-            // clockwise arc left of chord
-            if (distToArcCenterLessThanRadius(v1, v2, point)) {
-              windingNumber -= 1;
-            }
-          } else {
-            // clockwise arc right of chord
+    } else if (v2.y() <= point.y()) {
+      // downward crossing of arc chord
+      if (isCCW) {
+        if (!pointIsLeft) {
+          // counter clockwise arc right of chord
+          if (!distToArcCenterLessThanRadius(v1, v2)) {
             windingNumber -= 1;
           }
+        }
+        // else counter clockwise arc left of chord, no crossing
+      } else if (pointIsLeft) {
+        // clockwise arc left of chord
+        if (distToArcCenterLessThanRadius(v1, v2)) {
+          windingNumber -= 1;
         }
       } else {
-        // not crossing arc chord and chord is above, check if point is inside arc sector
-        if (isCCW && !pointIsLeft) {
-          if (v1.x() < point.x() && point.x() < v2.x() &&
-              distToArcCenterLessThanRadius(v1, v2, point)) {
-            windingNumber += 1;
-          }
-        } else if (!isCCW && pointIsLeft) {
-          if (v2.x() < point.x() && point.x() < v1.x() &&
-              distToArcCenterLessThanRadius(v1, v2, point)) {
-            windingNumber -= 1;
-          }
+        // clockwise arc right of chord
+        windingNumber -= 1;
+      }
+    } else {
+      // not crossing arc chord and chord is above, check if point is inside arc sector
+      if (isCCW && !pointIsLeft) {
+        if (v1.x() < point.x() && point.x() < v2.x() &&
+            distToArcCenterLessThanRadius(v1, v2)) {
+          windingNumber += 1;
+        }
+      } else if (!isCCW && pointIsLeft) {
+        if (v2.x() < point.x() && point.x() < v1.x() &&
+            distToArcCenterLessThanRadius(v1, v2)) {
+          windingNumber -= 1;
         }
       }
     }
-  };
-
-  auto visitor = [&](std::size_t i, std::size_t j) {
-    const auto &v1 = pline[i];
-    const auto &v2 = pline[j];
-    if (v1.bulgeIsZero()) {
-      lineVisitor(v1, v2);
-    } else {
-      arcVisitor(v1, v2);
-    }
-
-    return true;
-  };
-
-  pline.visitSegIndices(visitor);
+  }
 
   return windingNumber;
 }

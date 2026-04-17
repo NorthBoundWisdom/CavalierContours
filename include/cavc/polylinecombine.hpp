@@ -2,6 +2,7 @@
 #define CAVC_POLYLINECOMBINE_HPP
 #include "polyline.hpp"
 #include "polylineintersects.hpp"
+#include <cstdint>
 #include <unordered_map>
 #include <vector>
 
@@ -309,9 +310,10 @@ stitchOrderedSlicesIntoClosedPolylines(std::vector<Polyline<Real>> const &slices
   }
   spatialIndex.finish();
 
-  std::vector<bool> visitedSliceIndexes(slices.size(), false);
+  std::vector<std::uint8_t> visitedSliceIndexes(slices.size(), 0);
 
   std::vector<std::size_t> queryResults;
+  queryResults.reserve(8);
   std::vector<std::size_t> queryStack;
   queryStack.reserve(8);
 
@@ -329,10 +331,10 @@ stitchOrderedSlicesIntoClosedPolylines(std::vector<Polyline<Real>> const &slices
 
   // loop through all slice indexes
   for (std::size_t i = 0; i < slices.size(); ++i) {
-    if (visitedSliceIndexes[i]) {
+    if (visitedSliceIndexes[i] != 0) {
       continue;
     }
-    visitedSliceIndexes[i] = true;
+    visitedSliceIndexes[i] = 1;
 
     // create new polyline
     Polyline<Real> currPline;
@@ -351,17 +353,15 @@ stitchOrderedSlicesIntoClosedPolylines(std::vector<Polyline<Real>> const &slices
       }
       const auto &currEndPoint = currPline.lastVertex().pos();
       queryResults.clear();
-      spatialIndex.query(currEndPoint.x() - joinThreshold, currEndPoint.y() - joinThreshold,
-                         currEndPoint.x() + joinThreshold, currEndPoint.y() + joinThreshold,
-                         queryResults, queryStack);
-
-      // skip if only index found corresponds to current index
-      queryResults.erase(std::remove_if(queryResults.begin(), queryResults.end(),
-                                        [&](std::size_t index) {
-                                          return index != beginningSliceIndex &&
-                                                 visitedSliceIndexes[index];
-                                        }),
-                         queryResults.end());
+      auto queryVisitor = [&](std::size_t index) {
+        if (index == beginningSliceIndex || visitedSliceIndexes[index] == 0) {
+          queryResults.push_back(index);
+        }
+        return true;
+      };
+      spatialIndex.visitQuery(currEndPoint.x() - joinThreshold, currEndPoint.y() - joinThreshold,
+                              currEndPoint.x() + joinThreshold, currEndPoint.y() + joinThreshold,
+                              queryVisitor, queryStack);
 
       if (queryResults.size() == 0) {
         // may arrive here due to thresholding around coincident segments, just discard it
@@ -381,7 +381,7 @@ stitchOrderedSlicesIntoClosedPolylines(std::vector<Polyline<Real>> const &slices
       currPline.vertexes().pop_back();
       currPline.vertexes().insert(currPline.vertexes().end(), connectedSlice.vertexes().begin(),
                                   connectedSlice.vertexes().end());
-      visitedSliceIndexes[connectedSliceIndex] = true;
+      visitedSliceIndexes[connectedSliceIndex] = 1;
 
       // else continue stitching slices to current polyline, using last stitched index to find next
       currSliceIndex = connectedSliceIndex;
@@ -429,8 +429,7 @@ CombineResult<Real> combinePolylines(Polyline<Real> const &plineA, Polyline<Real
   auto isAInsideB = [&] { return pointInB(plineA[0].pos()); };
   auto isBInsideA = [&] { return pointInA(plineB[0].pos()); };
 
-  auto createUnionAndIntersectStitchSelector = [](std::size_t startOfCoincidentSlicesIdx)
-      -> std::function<std::size_t(std::size_t, std::vector<std::size_t> const &)> {
+  auto createUnionAndIntersectStitchSelector = [](std::size_t startOfCoincidentSlicesIdx) {
     return [=](std::size_t currSliceIndex, std::vector<std::size_t> const &available) {
       // attempt to select noncoincident slice
       auto idx = std::find_if(available.begin(), available.end(),
