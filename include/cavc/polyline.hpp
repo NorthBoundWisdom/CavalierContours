@@ -667,51 +667,77 @@ int getWindingNumber(Polyline<Real> const &pline, Vector2<Real> const &point) {
     return 0;
   }
 
+  const std::size_t plineSize = pline.size();
+  const Real pointX = point.x();
+  const Real pointY = point.y();
   int windingNumber = 0;
-  auto distToArcCenterLessThanRadius = [&](PlineVertex<Real> const &v1,
-                                           PlineVertex<Real> const &v2) {
-    auto arc = arcRadiusAndCenter(v1, v2);
-    Real dist2 = distSquared(arc.center, point);
-    return dist2 < arc.radius * arc.radius;
-  };
-
-  for (std::size_t i = 0, j = pline.size() - 1; i < pline.size(); j = i++) {
+  for (std::size_t i = 0, j = plineSize - 1; i < plineSize; j = i++) {
     PlineVertex<Real> const &v1 = pline[j];
     PlineVertex<Real> const &v2 = pline[i];
+    const Real v1X = v1.x();
+    const Real v1Y = v1.y();
+    const Real v2X = v2.x();
+    const Real v2Y = v2.y();
+
     if (v1.bulgeIsZero()) {
-      if (v1.y() <= point.y()) {
-        if (v2.y() > point.y() && isLeft(v1.pos(), v2.pos(), point)) {
+      if (v1Y <= pointY) {
+        if (v2Y > pointY && isLeft(v1.pos(), v2.pos(), point)) {
           // left and upward crossing
           windingNumber += 1;
         }
-      } else if (v2.y() <= point.y() && !(isLeft(v1.pos(), v2.pos(), point))) {
+      } else if (v2Y <= pointY && !(isLeft(v1.pos(), v2.pos(), point))) {
         // right and downward crossing
         windingNumber -= 1;
       }
       continue;
     }
 
-    bool isCCW = v1.bulgeIsPos();
+    const bool isCCW = v1.bulgeIsPos();
+    const bool startsBelowOrOnPoint = v1Y <= pointY;
+    const bool upwardCrossing = startsBelowOrOnPoint && v2Y > pointY;
+    const bool downwardCrossing = !startsBelowOrOnPoint && v2Y <= pointY;
     // to robustly handle the case where point is on the chord of an x axis aligned arc we must
     // count it as left going one direction and not left going the other (similar to using <= for
     // end points)
-    bool pointIsLeft =
+    const bool pointIsLeft =
         isCCW ? isLeft(v1.pos(), v2.pos(), point) : isLeftOrEqual(v1.pos(), v2.pos(), point);
+    auto pointIsInsideArcCircle = [&]() {
+      CAVC_ASSERT(!fuzzyEqual(v1.pos(), v2.pos()), "v1 must not be ontop of v2");
 
-    if (v1.y() <= point.y()) {
-      if (v2.y() > point.y()) {
+      // Match arcRadiusAndCenter(v1, v2) without computing chord length sqrt for the radius check.
+      const Real bulge = v1.bulge();
+      const Real bulgeSq = bulge * bulge;
+      const Real chordX = v2X - v1X;
+      const Real chordY = v2Y - v1Y;
+      const Real chordLenSq = chordX * chordX + chordY * chordY;
+      const Real centerOffsetFactor = (Real(1) - bulgeSq) / (Real(4) * bulge);
+      const Real midX = (v1X + v2X) / Real(2);
+      const Real midY = (v1Y + v2Y) / Real(2);
+      const Real centerX = midX - chordY * centerOffsetFactor;
+      const Real centerY = midY + chordX * centerOffsetFactor;
+      const Real radiusFactor = Real(1) + bulgeSq;
+      const Real radiusSq =
+          chordLenSq * radiusFactor * radiusFactor / (Real(16) * bulgeSq);
+      const Real pointToCenterX = pointX - centerX;
+      const Real pointToCenterY = pointY - centerY;
+      const Real distSq = pointToCenterX * pointToCenterX + pointToCenterY * pointToCenterY;
+      return distSq < radiusSq;
+    };
+
+    if (startsBelowOrOnPoint) {
+      if (upwardCrossing) {
         // upward crossing of arc chord
         if (isCCW) {
           if (pointIsLeft) {
             // counter clockwise arc left of chord
             windingNumber += 1;
-          } else if (distToArcCenterLessThanRadius(v1, v2)) {
+          } else if (pointIsInsideArcCircle()) {
             // counter clockwise arc right of chord
             windingNumber += 1;
           }
         } else if (pointIsLeft) {
           // clockwise arc left of chord
-          if (!distToArcCenterLessThanRadius(v1, v2)) {
+          if (!pointIsInsideArcCircle()) {
             windingNumber += 1;
           }
           // else clockwise arc right of chord, no crossing
@@ -719,30 +745,28 @@ int getWindingNumber(Polyline<Real> const &pline, Vector2<Real> const &point) {
       } else {
         // not crossing arc chord and chord is below, check if point is inside arc sector
         if (isCCW && !pointIsLeft) {
-          if (v2.x() < point.x() && point.x() < v1.x() &&
-              distToArcCenterLessThanRadius(v1, v2)) {
+          if (v2X < pointX && pointX < v1X && pointIsInsideArcCircle()) {
             windingNumber += 1;
           }
         } else if (!isCCW && pointIsLeft) {
-          if (v1.x() < point.x() && point.x() < v2.x() &&
-              distToArcCenterLessThanRadius(v1, v2)) {
+          if (v1X < pointX && pointX < v2X && pointIsInsideArcCircle()) {
             windingNumber -= 1;
           }
         }
       }
-    } else if (v2.y() <= point.y()) {
+    } else if (downwardCrossing) {
       // downward crossing of arc chord
       if (isCCW) {
         if (!pointIsLeft) {
           // counter clockwise arc right of chord
-          if (!distToArcCenterLessThanRadius(v1, v2)) {
+          if (!pointIsInsideArcCircle()) {
             windingNumber -= 1;
           }
         }
         // else counter clockwise arc left of chord, no crossing
       } else if (pointIsLeft) {
         // clockwise arc left of chord
-        if (distToArcCenterLessThanRadius(v1, v2)) {
+        if (pointIsInsideArcCircle()) {
           windingNumber -= 1;
         }
       } else {
@@ -752,13 +776,11 @@ int getWindingNumber(Polyline<Real> const &pline, Vector2<Real> const &point) {
     } else {
       // not crossing arc chord and chord is above, check if point is inside arc sector
       if (isCCW && !pointIsLeft) {
-        if (v1.x() < point.x() && point.x() < v2.x() &&
-            distToArcCenterLessThanRadius(v1, v2)) {
+        if (v1X < pointX && pointX < v2X && pointIsInsideArcCircle()) {
           windingNumber += 1;
         }
       } else if (!isCCW && pointIsLeft) {
-        if (v2.x() < point.x() && point.x() < v1.x() &&
-            distToArcCenterLessThanRadius(v1, v2)) {
+        if (v2X < pointX && pointX < v1X && pointIsInsideArcCircle()) {
           windingNumber -= 1;
         }
       }

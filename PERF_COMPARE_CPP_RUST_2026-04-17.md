@@ -1,13 +1,13 @@
 # C++ vs Rust 性能对比报告
 
-日期：2026-04-17  
+日期：2026-04-18
 工作区：`/Users/henrykang/Documents/CavalierContours`
 
 ## 1. 范围与版本
 
 本报告对比以下两套实现：
 
-- C++ 仓库：当前工作区代码，commit `384b3cf`
+- C++ 仓库：当前工作区最新代码
 - Rust 参考实现：`Downloads/cavalier_contours/cavalier_contours`
 
 说明：
@@ -157,18 +157,23 @@ cargo test -p cavalier_contours --release -- --skip attempting_to_wrap_slice_on_
 
 ### 4.4 Winding Number
 
+说明：
+
+- 下表已更新为后续 `winding number` 优化后的最新 C++ 数据
+- Rust 数据仍来自同一轮临时本地 harness
+
 | Case | C++ | Rust | 结论 |
 |---|---:|---:|---|
-| `Profile1` | 1.58 us | 1.11 us | Rust 快约 1.43x |
-| `Profile2` | 2.64 us | 1.87 us | Rust 快约 1.41x |
-| `Pathological1/100` | 44.3 us | 15.2 us | Rust 快约 2.91x |
-| `Profile1NoArcs` | 8.09 us | 7.87 us | Rust 略快约 1.03x |
-| `Profile2NoArcs` | 14.9 us | 17.0 us | C++ 快约 1.14x |
+| `Profile1` | 1.03 us | 1.11 us | C++ 快约 1.08x |
+| `Profile2` | 1.77 us | 1.87 us | C++ 快约 1.06x |
+| `Pathological1/100` | 22.0 us | 15.2 us | Rust 快约 1.45x |
+| `Profile1NoArcs` | 5.97 us | 7.87 us | C++ 快约 1.32x |
+| `Profile2NoArcs` | 12.1 us | 17.0 us | C++ 快约 1.41x |
 
 结论：
 
-- Rust 仍普遍更快，尤其在复杂曲线 case 上优势明显
-- 但在个别 `NoArcs` case 上，当前 C++ 已经可以反超
+- `winding number` 已经从“整体落后”变成“大多数代表 case 反超或接近”
+- 当前只在复杂曲线 case（`Pathological1/100`）上仍明显落后，差距也已从接近 `3x` 缩小到约 `1.45x`
 
 ## 5. 总结
 
@@ -186,9 +191,9 @@ cargo test -p cavalier_contours --release -- --skip attempting_to_wrap_slice_on_
    - 当前 C++ 在 identical-input 情况下利用快路径获得了数量级优势
    - 这是一个明确的、可归因的正向结果
 
-4. `extents` 和 `winding number` 仍然整体偏慢
-   - `extents` 差距中等
-   - `winding number` 在复杂 case 上差距仍较大，值得继续优化
+4. `extents` 仍然整体偏慢，而 `winding number` 已显著收敛
+   - `extents` 仍是当前更值得继续推进的基础函数热点
+   - `winding number` 已经在大多数代表 case 上追平或反超 Rust，后续如果继续优化，应只针对 arc-heavy / pathological 场景
 
 ## 6. 主要命令
 
