@@ -1,5 +1,6 @@
 #ifndef CAVC_POLYLINEINTERSECTS_HPP
 #define CAVC_POLYLINEINTERSECTS_HPP
+#include "internal/plinesliceview.hpp"
 #include "mathutils.hpp"
 #include "polyline.hpp"
 #include "vector2.hpp"
@@ -48,7 +49,7 @@ template <typename Real> struct PlineIntersectsResult {
 };
 
 template <typename Real> struct CoincidentSlicesResult {
-  std::vector<Polyline<Real>> coincidentSlices;
+  std::vector<internal::CoincidentSliceInfo<Real>> coincidentSlices;
   std::vector<PlineIntersect<Real>> sliceStartPoints;
   std::vector<PlineIntersect<Real>> sliceEndPoints;
   std::vector<bool> coincidentIsOpposingDirection;
@@ -90,104 +91,95 @@ sortAndjoinCoincidentSlices(std::vector<PlineCoincidentIntersect<Real>> &coincid
   auto &sliceEndPoints = result.sliceEndPoints;
   auto &coincidentSlices = result.coincidentSlices;
   auto &coincidentIsOpposingDirection = result.coincidentIsOpposingDirection;
-
-  Polyline<Real> currCoincidentSlice;
-
-  auto startCoincidentSliceAt = [&](std::size_t intrIndex) {
-    const auto &intr = coincidentIntrs[intrIndex];
-    const auto &v1 = pline1[intr.sIndex1];
-    const auto &v2 = pline1[utils::nextWrappingIndex(intr.sIndex1, pline1)];
-    const auto &u1 = pline2[intr.sIndex2];
-    const auto &u2 = pline2[utils::nextWrappingIndex(intr.sIndex2, pline2)];
-    auto const &t1 = segTangentVector(v1, v2, v1.pos());
-    auto const &t2 = segTangentVector(u1, u2, u1.pos());
-    // tangent vectors are either going same direction or opposite direction, just test dot product
-    // sign to determine if going same direction
-    auto dotP = dot(t1, t2);
-    bool sameDirection = dotP > Real(0);
-    coincidentIsOpposingDirection.push_back(!sameDirection);
-
-    auto split1 = splitAtPoint(v1, v2, intr.point1);
-    currCoincidentSlice.addVertex(split1.splitVertex);
-    auto split2 = splitAtPoint(v1, v2, intr.point2);
-    currCoincidentSlice.addVertex(split2.splitVertex);
-
+  auto makeSliceStart = [&](PlineCoincidentIntersect<Real> const &intr) {
     PlineIntersect<Real> sliceStart;
-    sliceStart.pos = split1.splitVertex.pos();
-
-    if (fuzzyEqual(v1.pos(), intr.point1, utils::realPrecision<Real>())) {
-      // coincidence starts at beginning of segment, report as starting at end of previous index
+    sliceStart.pos = intr.point1;
+    if (fuzzyEqual(pline1[intr.sIndex1].pos(), intr.point1, utils::realPrecision<Real>())) {
       sliceStart.sIndex1 = utils::prevWrappingIndex(intr.sIndex1, pline1);
     } else {
       sliceStart.sIndex1 = intr.sIndex1;
     }
 
-    if (fuzzyEqual(u1.pos(), sliceStart.pos, utils::realPrecision<Real>())) {
+    if (fuzzyEqual(pline2[intr.sIndex2].pos(), intr.point1, utils::realPrecision<Real>())) {
       sliceStart.sIndex2 = utils::prevWrappingIndex(intr.sIndex2, pline2);
     } else {
       sliceStart.sIndex2 = intr.sIndex2;
     }
-
-    sliceStartPoints.push_back(std::move(sliceStart));
+    return sliceStart;
   };
 
-  auto endCoincidentSliceAt = [&](std::size_t intrIndex) {
-    const auto &intr = coincidentIntrs[intrIndex];
-    const auto &u1 = pline2[intr.sIndex2];
-
-    coincidentSlices.emplace_back();
-    using namespace std;
-    swap(coincidentSlices.back(), currCoincidentSlice);
+  auto makeSliceEnd = [&](PlineCoincidentIntersect<Real> const &intr) {
     PlineIntersect<Real> sliceEnd;
     sliceEnd.pos = intr.point2;
     sliceEnd.sIndex1 = intr.sIndex1;
-    if (fuzzyEqual(u1.pos(), sliceEnd.pos, utils::realPrecision<Real>())) {
+    if (fuzzyEqual(pline2[intr.sIndex2].pos(), intr.point2, utils::realPrecision<Real>())) {
       sliceEnd.sIndex2 = utils::prevWrappingIndex(intr.sIndex2, pline2);
     } else {
       sliceEnd.sIndex2 = intr.sIndex2;
     }
-
-    sliceEndPoints.push_back(std::move(sliceEnd));
+    return sliceEnd;
   };
 
-  startCoincidentSliceAt(0);
-  for (std::size_t i = 1; i < coincidentIntrs.size(); ++i) {
-    const auto &intr = coincidentIntrs[i];
+  auto opposingDirectionAt = [&](PlineCoincidentIntersect<Real> const &intr) {
     const auto &v1 = pline1[intr.sIndex1];
     const auto &v2 = pline1[utils::nextWrappingIndex(intr.sIndex1, pline1)];
+    const auto &u1 = pline2[intr.sIndex2];
+    const auto &u2 = pline2[utils::nextWrappingIndex(intr.sIndex2, pline2)];
+    Vector2<Real> const t1 = segTangentVector(v1, v2, v1.pos());
+    Vector2<Real> const t2 = segTangentVector(u1, u2, u1.pos());
+    return dot(t1, t2) <= Real(0);
+  };
 
-    if (fuzzyEqual(intr.point1, currCoincidentSlice.lastVertex().pos(),
-                   utils::realPrecision<Real>())) {
-      // continue coincident slice
-      currCoincidentSlice.vertexes().pop_back();
-      auto split1 = splitAtPoint(v1, v2, intr.point1);
-      currCoincidentSlice.addVertex(split1.splitVertex);
-      auto split2 = splitAtPoint(v1, v2, intr.point2);
-      currCoincidentSlice.addVertex(split2.splitVertex);
+  std::size_t currSliceStartIndex = 0;
+  bool currOpposingDirection = opposingDirectionAt(coincidentIntrs[0]);
 
+  auto emitCoincidentSlice = [&](std::size_t endIntrIndex) {
+    auto const &startIntr = coincidentIntrs[currSliceStartIndex];
+    auto const &endIntr = coincidentIntrs[endIntrIndex];
+
+    internal::CoincidentSliceInfo<Real> sliceInfo;
+    sliceInfo.startPointOnA = {startIntr.sIndex1, startIntr.point1};
+    sliceInfo.endPointOnA = {endIntr.sIndex1, endIntr.point2};
+    if (currOpposingDirection) {
+      sliceInfo.startPointOnB = {endIntr.sIndex2, endIntr.point2};
+      sliceInfo.endPointOnB = {startIntr.sIndex2, startIntr.point1};
     } else {
-      // end coincident slice and start new
-      endCoincidentSliceAt(i - 1);
-      startCoincidentSliceAt(i);
+      sliceInfo.startPointOnB = {startIntr.sIndex2, startIntr.point1};
+      sliceInfo.endPointOnB = {endIntr.sIndex2, endIntr.point2};
+    }
+    sliceInfo.opposingDirection = currOpposingDirection;
+    coincidentSlices.push_back(sliceInfo);
+    sliceStartPoints.push_back(makeSliceStart(startIntr));
+    sliceEndPoints.push_back(makeSliceEnd(endIntr));
+    coincidentIsOpposingDirection.push_back(currOpposingDirection);
+  };
+
+  for (std::size_t i = 1; i < coincidentIntrs.size(); ++i) {
+    const auto &intr = coincidentIntrs[i];
+    auto const &prevIntr = coincidentIntrs[i - 1];
+
+    if (!fuzzyEqual(intr.point1, prevIntr.point2, utils::realPrecision<Real>())) {
+      emitCoincidentSlice(i - 1);
+      currSliceStartIndex = i;
+      currOpposingDirection = opposingDirectionAt(intr);
     }
   }
 
-  // cap off last slice
-  endCoincidentSliceAt(coincidentIntrs.size() - 1);
+  emitCoincidentSlice(coincidentIntrs.size() - 1);
 
   if (coincidentSlices.size() > 1) {
     // check if last coincident slice connects with first
-    const auto &lastSliceEnd = coincidentSlices.back().lastVertex().pos();
-    const auto &firstSliceBegin = coincidentSlices[0][0].pos();
-    if (fuzzyEqual(lastSliceEnd, firstSliceBegin, utils::realPrecision<Real>())) {
-      // they do connect, join them together
-      auto &lastSlice = coincidentSlices.back();
-      lastSlice.vertexes().pop_back();
-      lastSlice.vertexes().insert(lastSlice.vertexes().end(),
-                                  coincidentSlices[0].vertexes().begin(),
-                                  coincidentSlices[0].vertexes().end());
+    auto const &firstSlice = coincidentSlices.front();
+    auto &lastSlice = coincidentSlices.back();
+    if (fuzzyEqual(lastSlice.endPointOnA.pos, firstSlice.startPointOnA.pos,
+                   utils::realPrecision<Real>())) {
+      lastSlice.endPointOnA = firstSlice.endPointOnA;
+      if (lastSlice.opposingDirection) {
+        lastSlice.startPointOnB = firstSlice.startPointOnB;
+      } else {
+        lastSlice.endPointOnB = firstSlice.endPointOnB;
+      }
 
-      // cleanup
       sliceEndPoints.back() = sliceEndPoints[0];
       sliceEndPoints.erase(sliceEndPoints.begin());
       sliceStartPoints.erase(sliceStartPoints.begin());

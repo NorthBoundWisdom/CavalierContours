@@ -386,6 +386,39 @@ TEST_P(cavc_combine_plinesNoModifySuite, combine_plines_does_not_modify_input) {
   cavc_pline_list_delete(subtracted);
 }
 
+TEST(cavc_combine_plinesTests, coincident_edge_with_reversed_input_keeps_exact_union_vertices) {
+  std::vector<cavc_vertex> plineAVertexes = {
+      {0.0, 0.0, 0.0}, {2.0, 0.0, 0.0}, {2.0, 2.0, 0.0}, {0.0, 2.0, 0.0}};
+  std::vector<cavc_vertex> plineBVertexes = {
+      {2.0, 0.0, 0.0}, {4.0, 0.0, 0.0}, {4.0, 2.0, 0.0}, {2.0, 2.0, 0.0}};
+  reverseDirection(plineBVertexes);
+
+  cavc_pline *plineA = plineFromVertexes(plineAVertexes, true);
+  cavc_pline *plineB = plineFromVertexes(plineBVertexes, true);
+
+  cavc_pline_list *remaining = nullptr;
+  cavc_pline_list *subtracted = nullptr;
+  cavc_combine_plines(plineA, plineB, 0, &remaining, &subtracted);
+
+  ASSERT_EQ(cavc_pline_list_count(remaining), 1u);
+  ASSERT_EQ(cavc_pline_list_count(subtracted), 0u);
+
+  cavc_pline *result = cavc_pline_list_get(remaining, 0);
+  std::vector<cavc_vertex> resultVertexes(cavc_pline_vertex_count(result));
+  cavc_pline_vertex_data(result, resultVertexes.data());
+
+  std::vector<cavc_vertex> expected = {
+      {0.0, 0.0, 0.0}, {2.0, 0.0, 0.0}, {4.0, 0.0, 0.0},
+      {4.0, 2.0, 0.0}, {2.0, 2.0, 0.0}, {0.0, 2.0, 0.0}};
+  EXPECT_THAT(std::vector<std::vector<cavc_vertex>>{resultVertexes},
+              t::Pointwise(VertexListsFuzzyEqual(true), std::vector<std::vector<cavc_vertex>>{expected}));
+
+  cavc_pline_list_delete(remaining);
+  cavc_pline_list_delete(subtracted);
+  cavc_pline_delete(plineA);
+  cavc_pline_delete(plineB);
+}
+
 int main(int argc, char **argv) {
   t::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();

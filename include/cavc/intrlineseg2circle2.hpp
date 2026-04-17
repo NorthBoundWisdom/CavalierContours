@@ -50,7 +50,6 @@ IntrLineSeg2Circle2Result<Real> intrLineSeg2Circle2(Vector2<Real> const &p0,
     }
   } else {
     Real p0ShiftX = p0.x() - h;
-    Real p0ShiftY = p0.y() - k;
     Real p1ShiftX = p1.x() - h;
     Real p1ShiftY = p1.y() - k;
 
