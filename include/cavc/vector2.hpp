@@ -19,6 +19,16 @@ template <typename Real> Vector2<Real> unitPerp(Vector2<Real> const &v) {
   return result;
 }
 
+/// Normalized perpendicular vector to v, or zero if v is too small to normalize robustly.
+template <typename Real> Vector2<Real> safeUnitPerp(Vector2<Real> const &v) {
+  Vector2<Real> result{-v.y(), v.x()};
+  if (fuzzyZero(result, utils::realThreshold<Real>())) {
+    return Vector2<Real>::zero();
+  }
+  normalize(result);
+  return result;
+}
+
 /// Perpendicular dot product. Equivalent to dot(v0, perp(v1)).
 template <typename Real> Real perpDot(Vector2<Real> const &v0, Vector2<Real> const &v1) {
   return v0.x() * v1.y() - v0.y() * v1.x();
@@ -110,16 +120,22 @@ bool isRightOrCoincident(Vector2<Real> const &p0, Vector2<Real> const &p1,
 /// Test if a point is within a arc sweep angle region defined by center, start, end, and bulge.
 template <typename Real>
 bool pointWithinArcSweepAngle(Vector2<Real> const &center, Vector2<Real> const &arcStart,
-                              Vector2<Real> const &arcEnd, Real bulge, Vector2<Real> const &point) {
+                              Vector2<Real> const &arcEnd, Real bulge, Vector2<Real> const &point,
+                              Real epsilon = utils::realThreshold<Real>()) {
   CAVC_ASSERT(std::abs(bulge) > utils::realThreshold<Real>(), "expected arc");
   CAVC_ASSERT(std::abs(bulge) <= Real(1), "bulge should always be between -1 and 1");
+  Real startAngle = utils::normalizeRadians(angle(center, arcStart));
+  Real endAngle = utils::normalizeRadians(angle(center, arcEnd));
+  Real sweepAngle = utils::deltaAngle(startAngle, endAngle);
 
-  if (bulge > Real(0)) {
-    return isLeftOrCoincident(center, arcStart, point) &&
-           isRightOrCoincident(center, arcEnd, point);
+  if (bulge < Real(0) && sweepAngle > Real(0)) {
+    sweepAngle -= utils::tau<Real>();
+  } else if (bulge > Real(0) && sweepAngle < Real(0)) {
+    sweepAngle += utils::tau<Real>();
   }
 
-  return isRightOrCoincident(center, arcStart, point) && isLeftOrCoincident(center, arcEnd, point);
+  Real testAngle = utils::normalizeRadians(angle(center, point));
+  return utils::angleIsWithinSweep(startAngle, sweepAngle, testAngle, epsilon);
 }
 } // namespace cavc
 

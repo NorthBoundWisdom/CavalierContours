@@ -267,6 +267,39 @@ TEST(cavc_parallel_offsetTests, parallel_offset_handles_repeat_position_input_te
   cavc_pline_delete(pline);
 }
 
+TEST(cavc_parallel_offsetTests, parallel_offset_handles_collapsed_loop_input_test) {
+  std::vector<cavc_vertex> vertexes = {{1, 0, 0}, {-1, 0, 0}};
+  cavc_pline *pline = plineFromVertexes(vertexes, true);
+
+  {
+    cavc_pline_list *results = nullptr;
+    cavc_parallel_offset(pline, 1.0, &results, defaultParallelOffsetOptions());
+
+    ASSERT_EQ(cavc_pline_list_count(results), 1u);
+    cavc_pline *resultPline = cavc_pline_list_get(results, 0);
+    PolylineProperties actual(resultPline);
+    PolylineProperties expected(4, -7.141592653589793, 10.283185307179586, -2, -1, 2, 1);
+    ASSERT_EQ(actual, expected);
+
+    cavc_pline_list_delete(results);
+  }
+
+  {
+    cavc_pline_list *results = nullptr;
+    cavc_parallel_offset(pline, -1.0, &results, defaultParallelOffsetOptions());
+
+    ASSERT_EQ(cavc_pline_list_count(results), 1u);
+    cavc_pline *resultPline = cavc_pline_list_get(results, 0);
+    PolylineProperties actual(resultPline);
+    PolylineProperties expected(4, 7.141592653589793, 10.283185307179586, -2, -1, 2, 1);
+    ASSERT_EQ(actual, expected);
+
+    cavc_pline_list_delete(results);
+  }
+
+  cavc_pline_delete(pline);
+}
+
 TEST(cavc_parallel_offsetTests, parallel_offset_self_intersect_hint_handles_repeated_offset_case) {
   std::vector<cavc_vertex> vertexes = {
       {2.0, 11.0, -0.6681786379192991},
@@ -290,6 +323,41 @@ TEST(cavc_parallel_offsetTests, parallel_offset_self_intersect_hint_handles_repe
   PolylineProperties actual(resultPline);
   PolylineProperties expected(7, -64.3633792727984, 31.14604709099094, -3.0, 5.0, 4.0, 17.0);
   ASSERT_EQ(actual, expected);
+
+  cavc_pline_list_delete(results);
+  cavc_pline_delete(pline);
+}
+
+TEST(cavc_parallel_offsetTests, parallel_offset_handles_overlap_result_regression) {
+  std::vector<cavc_vertex> vertexes = {
+      {0.0, 0.0, 0.0},
+      {432.22004474869937, 0.0, 0.0},
+      {432.22004474869937, -620.7191231042452, 0.0},
+      {414.22004474869937, -620.7191231042452, 0.0},
+      {414.22004474869937, -18.0, 0.0},
+      {0.0, -18.0, 0.0},
+  };
+  cavc_pline *pline = plineFromVertexes(vertexes, true);
+
+  cavc_pline_list *results = nullptr;
+  cavc_parallel_offset(pline, -9.0, &results, defaultParallelOffsetOptions());
+
+  ASSERT_EQ(cavc_pline_list_count(results), 1u);
+  cavc_pline *resultPline = cavc_pline_list_get(results, 0);
+  EXPECT_TRUE(cavc_pline_is_closed(resultPline));
+  EXPECT_GE(cavc_pline_vertex_count(resultPline), 5u);
+  EXPECT_NEAR(cavc_get_area(resultPline), -17.38274876480773, 1e-5);
+  EXPECT_NEAR(cavc_get_path_length(resultPline), 2030.0155026470434, 1e-5);
+
+  cavc_real min_x = 0.0;
+  cavc_real min_y = 0.0;
+  cavc_real max_x = 0.0;
+  cavc_real max_y = 0.0;
+  cavc_get_extents(resultPline, &min_x, &min_y, &max_x, &max_y);
+  EXPECT_NEAR(min_x, 9.0, 1e-5);
+  EXPECT_NEAR(min_y, -611.7191231042452, 1e-5);
+  EXPECT_NEAR(max_x, 423.22004474869937, 1e-5);
+  EXPECT_NEAR(max_y, -9.0, 1e-5);
 
   cavc_pline_list_delete(results);
   cavc_pline_delete(pline);

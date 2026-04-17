@@ -10,6 +10,7 @@
 
 #include "c_api_include/cavaliercontours.h"
 #include "c_api_test_helpers.hpp"
+#include "cavc/intrlineseg2circle2.hpp"
 #include "shape_offset_self_intersect_case.hpp"
 
 namespace t = testing;
@@ -450,6 +451,63 @@ TEST(CApiRegression, ArcArcOpposingDirectionTouchAtEndsReturnsSharedEndpoint) {
   Vertex const reversed_u1(-171.0, -225.631646989571, 0.553407781718062);
   Vertex const reversed_u2(-153.0, -196.91384910249, -0.553407781718061);
   expect_single_intersection(v1, v2, reversed_u1, reversed_u2, expected);
+}
+
+TEST(CApiRegression, LineCircleTangentAtStartPointIsStable) {
+  auto result = cavc::intrLineSeg2Circle2(
+      cavc::Vector2<cavc_real>(161.28999999999999, 113.66500000000001),
+      cavc::Vector2<cavc_real>(167.63999999999999, 113.66500000000001), 0.63499999999999801,
+      cavc::Vector2<cavc_real>(161.28999999999999, 114.30000000000001));
+
+  ASSERT_EQ(result.numIntersects, 1);
+  EXPECT_NEAR(result.t0, 0.0, 1e-8);
+}
+
+TEST(CApiRegression, OverlappingPillEndsBooleanRegression) {
+  std::vector<cavc_vertex> pline_a = {
+      {113.1450199999994, 99.04090098302, 0.0},
+      {113.1449999999994, 114.30000098302, 1.0},
+      {111.6450000000006, 114.29999901698, 0.0},
+      {111.6450200000006, 99.04089901698, 1.0},
+  };
+  std::vector<cavc_vertex> pline_b = {
+      {113.145, 114.3, 0.0},
+      {113.145, 117.475, 1.0},
+      {111.645, 117.475, 0.0},
+      {111.645, 114.3, 1.0},
+  };
+
+  PlinePtr a(plineFromVertexes(pline_a, true));
+  PlinePtr b(plineFromVertexes(pline_b, true));
+
+  auto expect_remaining = [&](int mode, std::vector<PolylineProperties> const &expected) {
+    cavc_pline_list *remaining = nullptr;
+    cavc_pline_list *subtracted = nullptr;
+    cavc_combine_plines(a.get(), b.get(), mode, &remaining, &subtracted);
+    ASSERT_EQ(cavc_pline_list_count(remaining), expected.size());
+    ASSERT_EQ(cavc_pline_list_count(subtracted), 0u);
+
+    std::vector<PolylineProperties> actual;
+    actual.reserve(expected.size());
+    for (uint32_t i = 0; i < expected.size(); ++i) {
+      actual.emplace_back(cavc_pline_list_get(remaining, i));
+    }
+
+    ASSERT_THAT(actual, t::UnorderedPointwise(EqIgnoreSignOfArea(), expected));
+    cavc_pline_list_delete(remaining);
+    cavc_pline_list_delete(subtracted);
+  };
+
+  expect_remaining(0, {PolylineProperties(6, 29.418295867659253, 41.58058898041103, 111.645,
+                                          98.29089999999995, 113.14502000000005, 118.225)});
+  expect_remaining(2, {PolylineProperties(2, 1.7671458676433858, 4.712388980383754, 111.645,
+                                          113.54999950849015, 113.14500000000015, 115.04999950848986)});
+  expect_remaining(1, {PolylineProperties(4, -22.88864926275236, 35.230587997390565, 111.6450000000006,
+                                          98.29089999999995, 113.14502000000005, 114.3)});
+  expect_remaining(3, {PolylineProperties(4, -22.88864926275236, 35.230587997390565, 111.6450000000006,
+                                          98.29089999999995, 113.14502000000005, 114.3),
+                       PolylineProperties(4, 4.762500737263508, 11.062389963404218, 111.645,
+                                          114.29999901698, 113.145, 118.225)});
 }
 
 TEST(CApiRegression, ParallelOffsetArcInvolvedMiterLimitCanForceBevelEquivalentResult) {

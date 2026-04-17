@@ -48,7 +48,7 @@ std::vector<PlineOffsetSegment<Real>> createUntrimmedOffsetSegments(Polyline<Rea
     seg.collapsedArc = false;
     seg.origV2Pos = v2.pos();
     Vector2<Real> edge = v2.pos() - v1.pos();
-    Vector2<Real> offsetV = offset * unitPerp(edge);
+    Vector2<Real> offsetV = offset * safeUnitPerp(edge);
     seg.v1.pos() = v1.pos() + offsetV;
     seg.v1.bulge() = v1.bulge();
     seg.v2.pos() = v2.pos() + offsetV;
@@ -60,9 +60,9 @@ std::vector<PlineOffsetSegment<Real>> createUntrimmedOffsetSegments(Polyline<Rea
     Real offs = v1.bulgeIsNeg() ? offset : -offset;
     Real radiusAfterOffset = arc.radius + offs;
     Vector2<Real> v1ToCenter = v1.pos() - arc.center;
-    normalize(v1ToCenter);
+    safeNormalize(v1ToCenter);
     Vector2<Real> v2ToCenter = v2.pos() - arc.center;
-    normalize(v2ToCenter);
+    safeNormalize(v2ToCenter);
 
     result.emplace_back();
     PlineOffsetSegment<Real> &seg = result.back();
@@ -160,9 +160,14 @@ void lineToLineJoin(PlineOffsetSegment<Real> const &s1, PlineOffsetSegment<Real>
 
     switch (intrResult.intrType) {
     case LineSeg2LineSeg2IntrType::None:
-      // just join with straight line
-      addOrReplaceIfSamePos(result, PlineVertex<Real>(v2.pos(), Real(0)));
-      addOrReplaceIfSamePos(result, u1);
+      if (joinType == OffsetJoinType::Round) {
+        // Parallel offset segments of a collapsed loop should connect with a half circle instead of
+        // a straight chord.
+        connectUsingArc();
+      } else {
+        addOrReplaceIfSamePos(result, PlineVertex<Real>(v2.pos(), Real(0)));
+        addOrReplaceIfSamePos(result, u1);
+      }
       break;
     case LineSeg2LineSeg2IntrType::True:
       addOrReplaceIfSamePos(result, PlineVertex<Real>(intrResult.point, Real(0)));
@@ -318,14 +323,14 @@ Vector2<Real> openPolylineEndpointTangent(Polyline<Real> const &pline, bool atSt
                                 bool atSegmentStartPoint) {
     if (segStart.bulgeIsZero()) {
       Vector2<Real> d = segEnd.pos() - segStart.pos();
-      normalize(d);
+      safeNormalize(d);
       return d;
     }
 
     auto arc = arcRadiusAndCenter(segStart, segEnd);
     Vector2<Real> radial =
         atSegmentStartPoint ? (segStart.pos() - arc.center) : (segEnd.pos() - arc.center);
-    normalize(radial);
+    safeNormalize(radial);
     Vector2<Real> tangent = unitPerp(radial);
     if (segStart.bulgeIsNeg()) {
       tangent = -tangent;
@@ -416,7 +421,8 @@ void lineToArcJoin(PlineOffsetSegment<Real> const &s1, PlineOffsetSegment<Real> 
   auto processIntersect = [&](Real t, Vector2<Real> const &intersect) {
     const bool trueSegIntersect = !falseIntersect(t);
     const bool trueArcIntersect =
-        pointWithinArcSweepAngle(arc.center, u1.pos(), u2.pos(), u1.bulge(), intersect);
+        pointWithinArcSweepAngle(arc.center, u1.pos(), u2.pos(), u1.bulge(), intersect,
+                                 utils::realPrecision<Real>());
     if (trueSegIntersect && trueArcIntersect) {
       // trim at intersect
       Real a = angle(arc.center, intersect);
@@ -487,7 +493,8 @@ void arcToLineJoin(PlineOffsetSegment<Real> const &s1, PlineOffsetSegment<Real> 
   auto processIntersect = [&](Real t, Vector2<Real> const &intersect) {
     const bool trueSegIntersect = !falseIntersect(t);
     const bool trueArcIntersect =
-        pointWithinArcSweepAngle(arc.center, v1.pos(), v2.pos(), v1.bulge(), intersect);
+        pointWithinArcSweepAngle(arc.center, v1.pos(), v2.pos(), v1.bulge(), intersect,
+                                 utils::realPrecision<Real>());
     if (trueSegIntersect && trueArcIntersect) {
       PlineVertex<Real> &prevVertex = result.lastVertex();
 
@@ -557,9 +564,11 @@ void arcToArcJoin(PlineOffsetSegment<Real> const &s1, PlineOffsetSegment<Real> c
 
   auto processIntersect = [&](Vector2<Real> const &intersect) {
     const bool trueArcIntersect1 =
-        pointWithinArcSweepAngle(arc1.center, v1.pos(), v2.pos(), v1.bulge(), intersect);
+        pointWithinArcSweepAngle(arc1.center, v1.pos(), v2.pos(), v1.bulge(), intersect,
+                                 utils::realPrecision<Real>());
     const bool trueArcIntersect2 =
-        pointWithinArcSweepAngle(arc2.center, u1.pos(), u2.pos(), u1.bulge(), intersect);
+        pointWithinArcSweepAngle(arc2.center, u1.pos(), u2.pos(), u1.bulge(), intersect,
+                                 utils::realPrecision<Real>());
 
     if (trueArcIntersect1 && trueArcIntersect2) {
       PlineVertex<Real> &prevVertex = result.lastVertex();
@@ -642,7 +651,8 @@ void offsetCircleIntersectsWithPline(Polyline<Real> const &pline, Real offset,
                                  Vector2<Real> const &arcEnd, Real bulge,
                                  Vector2<Real> const &intrPoint) {
     return !fuzzyEqual(arcStart, intrPoint, utils::realPrecision<Real>()) &&
-           pointWithinArcSweepAngle(arcCenter, arcStart, arcEnd, bulge, intrPoint);
+           pointWithinArcSweepAngle(arcCenter, arcStart, arcEnd, bulge, intrPoint,
+                                    utils::realPrecision<Real>());
   };
 
   for (std::size_t sIndex : queryResults) {
@@ -714,7 +724,8 @@ void offsetLineIntersectsWithPline(Polyline<Real> const &pline, Vector2<Real> co
                                  Vector2<Real> const &arcEnd, Real bulge,
                                  Vector2<Real> const &intrPoint) {
     return !fuzzyEqual(arcStart, intrPoint, utils::realPrecision<Real>()) &&
-           pointWithinArcSweepAngle(arcCenter, arcStart, arcEnd, bulge, intrPoint);
+           pointWithinArcSweepAngle(arcCenter, arcStart, arcEnd, bulge, intrPoint,
+                                    utils::realPrecision<Real>());
   };
 
   std::size_t const segCount = pline.isClosed() ? pline.size() : pline.size() - 1;
@@ -781,7 +792,7 @@ bool pointValidForOffset(Polyline<Real> const &pline, Real offset,
 
   auto visitor = [&](std::size_t i) {
     std::size_t j = utils::nextWrappingIndex(i, pline.vertexes());
-    auto closestPoint = closestPointOnSeg(pline[i], pline[j], point);
+    auto closestPoint = closestPointOnSeg(pline[i], pline[j], point, utils::realPrecision<Real>());
     Real dist = distSquared(closestPoint, point);
     pointValid = dist > minDist;
     return pointValid;
@@ -1634,6 +1645,54 @@ std::vector<Polyline<Real>> filterSimpleClosedLoops(std::vector<Polyline<Real>> 
 }
 
 template <typename Real>
+bool hasOnlyEndpointTouchIntersects(Polyline<Real> const &candidate) {
+  if (!candidate.isClosed() || candidate.size() < 3) {
+    return false;
+  }
+
+  auto spatialIndex = createApproxSpatialIndex(candidate);
+  std::vector<PlineIntersect<Real>> intersects;
+  globalSelfIntersects(candidate, intersects, spatialIndex);
+  Real const epsilon = utils::realPrecision<Real>();
+
+  for (auto const &intr : intersects) {
+    std::size_t const endIndex1 = utils::nextWrappingIndex(intr.sIndex1, candidate);
+    std::size_t const endIndex2 = utils::nextWrappingIndex(intr.sIndex2, candidate);
+    bool const onSeg1Endpoint = fuzzyEqual(candidate[intr.sIndex1].pos(), intr.pos, epsilon) ||
+                                fuzzyEqual(candidate[endIndex1].pos(), intr.pos, epsilon);
+    bool const onSeg2Endpoint = fuzzyEqual(candidate[intr.sIndex2].pos(), intr.pos, epsilon) ||
+                                fuzzyEqual(candidate[endIndex2].pos(), intr.pos, epsilon);
+    if (!(onSeg1Endpoint && onSeg2Endpoint)) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+template <typename Real>
+std::vector<Polyline<Real>>
+filterClosedLoopsAllowingEndpointTouches(std::vector<Polyline<Real>> const &candidates) {
+  std::vector<Polyline<Real>> filtered;
+  filtered.reserve(candidates.size());
+  for (auto const &candidate : candidates) {
+    if (!candidate.isClosed() || candidate.size() < 3) {
+      continue;
+    }
+    if (std::abs(getArea(candidate)) < Real(1e-4) || getPathLength(candidate) <= Real(1e-2)) {
+      continue;
+    }
+    if (!hasOnlyEndpointTouchIntersects(candidate)) {
+      continue;
+    }
+
+    filtered.push_back(candidate);
+  }
+
+  return filtered;
+}
+
+template <typename Real>
 std::vector<Polyline<Real>> filterCollapsedLineLoops(std::vector<Polyline<Real>> const &candidates) {
   if (candidates.size() != 1) {
     return {};
@@ -1815,6 +1874,11 @@ std::vector<Polyline<Real>> parallelOffset(Polyline<Real> const &pline, Real off
       return rescuedResult;
     }
 
+    auto endpointTouchResult = filterClosedLoopsAllowingEndpointTouches(result);
+    if (!endpointTouchResult.empty()) {
+      return endpointTouchResult;
+    }
+
     auto tryRoundFallback = [&]() {
       ParallelOffsetOptions<Real> fallbackOptions = options;
       fallbackOptions.joinType = OffsetJoinType::Round;
@@ -1853,6 +1917,11 @@ std::vector<Polyline<Real>> parallelOffset(Polyline<Real> const &pline, Real off
   auto rescuedResult = stitchSlicesIntoSimpleClosedLoops(slices, rawOffset.size() - 1);
   if (!rescuedResult.empty()) {
     return rescuedResult;
+  }
+
+  auto endpointTouchResult = filterClosedLoopsAllowingEndpointTouches(result);
+  if (!endpointTouchResult.empty()) {
+    return endpointTouchResult;
   }
 
   return std::vector<Polyline<Real>>();

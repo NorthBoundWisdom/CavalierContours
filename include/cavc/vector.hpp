@@ -263,6 +263,15 @@ template <std::size_t N, typename Real> Real normalize(Vector<Real, N> &v) {
   v /= length;
   return length;
 }
+
+template <std::size_t N, typename Real> Real safeNormalize(Vector<Real, N> &v) {
+  if (fuzzyZero(v, utils::realThreshold<Real>())) {
+    v.makeZero();
+    return Real(0);
+  }
+
+  return normalize(v);
+}
 } // namespace cavc
 
 #endif // CAVC_VECTOR_HPP

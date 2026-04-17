@@ -40,6 +40,9 @@ intrLineSeg2LineSeg2(Vector2<Real> const &u1, Vector2<Real> const &u2, Vector2<R
   Vector2<Real> u = u2 - u1;
   Vector2<Real> v = v2 - v1;
   Real d = perpDot(u, v);
+  Real const uLength = length(u);
+  Real const vLength = length(v);
+  Real const epsilon = utils::realThreshold<Real>();
 
   Vector2<Real> w = u1 - v1;
 
@@ -63,10 +66,10 @@ intrLineSeg2LineSeg2(Vector2<Real> const &u1, Vector2<Real> const &u2, Vector2<R
     result.t0 = perpDot(v, w) / d;
     result.t1 = perpDot(u, w) / d;
     result.point = v1 + result.t1 * v;
-    if (result.t0 + utils::realThreshold<Real>() < Real(0) ||
-        result.t0 > Real(1) + utils::realThreshold<Real>() ||
-        result.t1 + utils::realThreshold<Real>() < Real(0) ||
-        result.t1 > Real(1) + utils::realThreshold<Real>()) {
+    if ((result.t0 * uLength) + epsilon < Real(0) ||
+        result.t0 * uLength > uLength + epsilon ||
+        (result.t1 * vLength) + epsilon < Real(0) ||
+        result.t1 * vLength > vLength + epsilon) {
       result.intrType = LineSeg2LineSeg2IntrType::False;
     } else {
       result.intrType = LineSeg2LineSeg2IntrType::True;
@@ -127,14 +130,14 @@ intrLineSeg2LineSeg2(Vector2<Real> const &u1, Vector2<Real> const &u2, Vector2<R
 
         // using threshold check here to make intersect "sticky" to prefer considering it an
         // intersect
-        if (result.t0 > Real(1) + utils::realThreshold<Real>() ||
-            result.t1 + utils::realThreshold<Real>() < Real(0)) {
+        if (result.t0 * vLength > vLength + epsilon ||
+            result.t1 * vLength + epsilon < Real(0)) {
           // no overlap
           result.intrType = LineSeg2LineSeg2IntrType::None;
         } else {
           result.t0 = std::max(result.t0, Real(0));
           result.t1 = std::min(result.t1, Real(1));
-          if (std::abs(result.t1 - result.t0) < utils::realThreshold<Real>()) {
+          if (std::abs((result.t1 - result.t0) * vLength) < epsilon) {
             // intersect is a single point (segments line up end to end)
             result.intrType = LineSeg2LineSeg2IntrType::True;
             result.point = v1 + result.t0 * v;

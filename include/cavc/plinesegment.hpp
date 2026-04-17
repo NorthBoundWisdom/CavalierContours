@@ -150,19 +150,20 @@ Vector2<Real> segTangentVector(PlineVertex<Real> const &v1, PlineVertex<Real> co
 /// Compute the closest point on a segment defined by v1 to v2 to the point given.
 template <typename Real>
 Vector2<Real> closestPointOnSeg(PlineVertex<Real> const &v1, PlineVertex<Real> const &v2,
-                                Vector2<Real> const &point) {
+                                Vector2<Real> const &point,
+                                Real epsilon = utils::realPrecision<Real>()) {
   if (v1.bulgeIsZero()) {
     return closestPointOnLineSeg(v1.pos(), v2.pos(), point);
   }
 
   auto arc = arcRadiusAndCenter(v1, v2);
 
-  if (fuzzyEqual(point, arc.center)) {
+  if (fuzzyEqual(point, arc.center, epsilon)) {
     // avoid normalizing zero length vector (point is at center, just return start point)
     return v1.pos();
   }
 
-  if (pointWithinArcSweepAngle(arc.center, v1.pos(), v2.pos(), v1.bulge(), point)) {
+  if (pointWithinArcSweepAngle(arc.center, v1.pos(), v2.pos(), v1.bulge(), point, epsilon)) {
     // closest point is on the arc
     Vector2<Real> vToPoint = point - arc.center;
     normalize(vToPoint);
@@ -316,18 +317,20 @@ IntrPlineSegsResult<Real> intrPlineSegs(PlineVertex<Real> const &v1, PlineVertex
   // helper function to process line arc intersect
   auto processLineArcIntr = [&result](Vector2<Real> const &p0, Vector2<Real> const &p1,
                                       PlineVertex<Real> const &a1, PlineVertex<Real> const &a2) {
+    Real const epsilon = utils::realPrecision<Real>();
     auto arc = arcRadiusAndCenter(a1, a2);
     auto intrResult = intrLineSeg2Circle2(p0, p1, arc.radius, arc.center);
+    Real const lineLength = length(p1 - p0);
 
     // helper function to test and get point within arc sweep
     auto pointInSweep = [&](Real t) {
-      if (t + utils::realThreshold<Real>() < Real(0) ||
-          t > Real(1) + utils::realThreshold<Real>()) {
+      if (t * lineLength + epsilon < Real(0) || t * lineLength > lineLength + epsilon) {
         return std::make_pair(false, Vector2<Real>());
       }
 
       Vector2<Real> p = pointFromParametric(p0, p1, t);
-      bool withinSweep = pointWithinArcSweepAngle(arc.center, a1.pos(), a2.pos(), a1.bulge(), p);
+      bool withinSweep =
+          pointWithinArcSweepAngle(arc.center, a1.pos(), a2.pos(), a1.bulge(), p, epsilon);
       return std::make_pair(withinSweep, p);
     };
 
@@ -397,9 +400,10 @@ IntrPlineSegsResult<Real> intrPlineSegs(PlineVertex<Real> const &v1, PlineVertex
       return std::make_pair(startAngle, sweepAngle);
     };
 
+    Real const epsilon = utils::realPrecision<Real>();
     auto bothArcsSweepPoint = [&](Vector2<Real> const &pt) {
-      return pointWithinArcSweepAngle(arc1.center, v1.pos(), v2.pos(), v1.bulge(), pt) &&
-             pointWithinArcSweepAngle(arc2.center, u1.pos(), u2.pos(), u1.bulge(), pt);
+      return pointWithinArcSweepAngle(arc1.center, v1.pos(), v2.pos(), v1.bulge(), pt, epsilon) &&
+             pointWithinArcSweepAngle(arc2.center, u1.pos(), u2.pos(), u1.bulge(), pt, epsilon);
     };
 
     auto intrResult = intrCircle2Circle2(arc1.radius, arc1.center, arc2.radius, arc2.center);
@@ -450,13 +454,14 @@ IntrPlineSegsResult<Real> intrPlineSegs(PlineVertex<Real> const &v1, PlineVertex
       auto arc1End = arc1StartAndSweep.first + arc1StartAndSweep.second;
       auto arc2End = arc2StartAndSweep.first + arc2StartAndSweep.second;
 
-      if (std::abs(utils::deltaAngle(arc1StartAndSweep.first, arc2End)) <
-          utils::realThreshold<Real>()) {
+      Real const avgRadius = (arc1.radius + arc2.radius) / Real(2);
+      if (std::abs(avgRadius * utils::deltaAngle(arc1StartAndSweep.first, arc2End)) <
+          epsilon) {
         // only end points touch at start of arc1
         result.intrType = PlineSegIntrType::OneIntersect;
         result.point1 = v1.pos();
-      } else if (std::abs(utils::deltaAngle(arc2StartAndSweep.first, arc1End)) <
-                 utils::realThreshold<Real>()) {
+      } else if (std::abs(avgRadius * utils::deltaAngle(arc2StartAndSweep.first, arc1End)) <
+                 epsilon) {
         // only end points touch at start of arc2
         result.intrType = PlineSegIntrType::OneIntersect;
         result.point1 = sameDirectionArcs ? u1.pos() : u2.pos();

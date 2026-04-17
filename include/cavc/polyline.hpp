@@ -87,69 +87,38 @@ template <typename Real> AABB<Real> getExtents(Polyline<Real> const &pline) {
   }
 
   AABB<Real> result{pline[0].x(), pline[0].y(), pline[0].x(), pline[0].y()};
+  auto updateWithPoint = [&](Vector2<Real> const &p) {
+    if (p.x() < result.xMin)
+      result.xMin = p.x();
+    if (p.y() < result.yMin)
+      result.yMin = p.y();
+    if (p.x() > result.xMax)
+      result.xMax = p.x();
+    if (p.y() > result.yMax)
+      result.yMax = p.y();
+  };
 
   auto visitor = [&](std::size_t i, std::size_t j) {
     PlineVertex<Real> const &v1 = pline[i];
-    if (v1.bulgeIsZero()) {
-      if (v1.x() < result.xMin)
-        result.xMin = v1.x();
-      if (v1.y() < result.yMin)
-        result.yMin = v1.y();
-      if (v1.x() > result.xMax)
-        result.xMax = v1.x();
-      if (v1.y() > result.yMax)
-        result.yMax = v1.y();
+    PlineVertex<Real> const &v2 = pline[j];
+    updateWithPoint(v1.pos());
+    updateWithPoint(v2.pos());
+
+    if (v1.bulgeIsZero() ||
+        fuzzyEqual(v1.pos(), v2.pos(), utils::realPrecision<Real>())) {
+      // line segment or degenerate arc, endpoints already accounted for
     } else {
-      PlineVertex<Real> const &v2 = pline[j];
       auto arc = arcRadiusAndCenter(v1, v2);
+      constexpr Real cardinalAngles[] = {Real(0), Real(0.5) * utils::pi<Real>(),
+                                         utils::pi<Real>(), Real(1.5) * utils::pi<Real>()};
 
-      Real startAngle = angle(arc.center, v1.pos());
-      Real endAngle = angle(arc.center, v2.pos());
-      Real sweepAngle = utils::deltaAngle(startAngle, endAngle);
-
-      // handle special case of half circle, or more than half circle
-      if ((sweepAngle > 0.0) && (v1.bulge() < 0.0)) {
-        sweepAngle = sweepAngle - 2.0 * utils::pi<Real>();
+      for (Real angleValue : cardinalAngles) {
+        Vector2<Real> arcPoint = pointOnCircle(arc.radius, arc.center, angleValue);
+        if (pointWithinArcSweepAngle(arc.center, v1.pos(), v2.pos(), v1.bulge(), arcPoint,
+                                     utils::realPrecision<Real>())) {
+          updateWithPoint(arcPoint);
+        }
       }
-
-      Real arcXMin, arcYMin, arcXMax, arcYMax;
-
-      // crosses PI/2
-      if (utils::angleIsWithinSweep(startAngle, sweepAngle, Real(0.5) * utils::pi<Real>())) {
-        arcYMax = arc.center.y() + arc.radius;
-      } else {
-        arcYMax = std::max(v1.y(), v2.y());
-      }
-
-      // crosses PI
-      if (utils::angleIsWithinSweep(startAngle, sweepAngle, utils::pi<Real>())) {
-        arcXMin = arc.center.x() - arc.radius;
-      } else {
-        arcXMin = std::min(v1.x(), v2.x());
-      }
-
-      // crosses 3PI/2
-      if (utils::angleIsWithinSweep(startAngle, sweepAngle, Real(1.5) * utils::pi<Real>())) {
-        arcYMin = arc.center.y() - arc.radius;
-      } else {
-        arcYMin = std::min(v1.y(), v2.y());
-      }
-
-      // crosses 2PI
-      if (utils::angleIsWithinSweep(startAngle, sweepAngle, Real(2) * utils::pi<Real>())) {
-        arcXMax = arc.center.x() + arc.radius;
-      } else {
-        arcXMax = std::max(v1.x(), v2.x());
-      }
-
-      if (arcXMin < result.xMin)
-        result.xMin = arcXMin;
-      if (arcYMin < result.yMin)
-        result.yMin = arcYMin;
-      if (arcXMax > result.xMax)
-        result.xMax = arcXMax;
-      if (arcYMax > result.yMax)
-        result.yMax = arcYMax;
     }
 
     // return true to iterate all segments
