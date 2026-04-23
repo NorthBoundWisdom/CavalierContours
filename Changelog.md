@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+- Harden the staged join/end-cap implementation for maintenance:
+  - document precise open end-cap semantics (`round` endpoint-circle clipping, `square`
+    endpoint-tangent extension, `butt` endpoint-normal clipping) and clarify that these are open
+    offset-curve semantics rather than closed cap-face generation
+  - document `round`/`miter`/`bevel` join semantics, including miter-limit beveling and
+    collapsed-arc local beveling
+  - reject invalid C API parallel-offset options with an allocated empty output list instead of
+    silently converting unknown enum values to `round`
+  - centralize scale-aware output quality thresholds used by open-result and relaxed closed-loop
+    recovery filters
+  - add fixed-seed join/end-cap regression corpus for open and closed offsets
+  - add CI workflow coverage for GCC/Clang/MSVC, static/shared/header-only builds, tests, and
+    benchmark compilation
+  - add a focused `offsethardeningbenchmarks` target for join/end-cap maintenance baselines
 - Add runtime-configurable geometry tolerances in `mathutils`:
   - `setEpsilonConfig`, `getEpsilonConfig`, `resetEpsilonConfig`
   - preserve existing defaults (`1e-8`, `1e-5`, `1e-4`, `1e-4`)

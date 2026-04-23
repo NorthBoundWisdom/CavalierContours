@@ -2,6 +2,8 @@
 #include "cavc/polylinecombine.hpp"
 #include "cavc/polylineoffset.hpp"
 #include "cavc/polylineoffsetislands.hpp"
+#include <cmath>
+#include <exception>
 #include <iostream>
 #include <limits>
 #include <memory>
@@ -57,7 +59,41 @@ static cavc::ClosedPolylineWinding to_cpp_closed_winding(cavc_closed_winding win
     return cavc::ClosedPolylineWinding::Clockwise;
   }
   CAVC_ASSERT(false, "Unhandled closed winding enum");
-  return cavc::ClosedPolylineWinding::Keep;
+  std::terminate();
+}
+
+static bool is_valid_offset_join_type(cavc_offset_join_type join_type) {
+  switch (join_type) {
+  case CAVC_OFFSET_JOIN_ROUND:
+  case CAVC_OFFSET_JOIN_MITER:
+  case CAVC_OFFSET_JOIN_BEVEL:
+    return true;
+  }
+  return false;
+}
+
+static bool is_valid_offset_end_cap_type(cavc_offset_end_cap_type end_cap_type) {
+  switch (end_cap_type) {
+  case CAVC_OFFSET_END_CAP_ROUND:
+  case CAVC_OFFSET_END_CAP_SQUARE:
+  case CAVC_OFFSET_END_CAP_BUTT:
+    return true;
+  }
+  return false;
+}
+
+static bool is_valid_parallel_offset_options(cavc_parallel_offset_options const &options) {
+  if (!is_valid_offset_join_type(options.join_type) ||
+      !is_valid_offset_end_cap_type(options.end_cap_type)) {
+    return false;
+  }
+
+  if (options.join_type == CAVC_OFFSET_JOIN_MITER &&
+      (!std::isfinite(options.miter_limit) || options.miter_limit < cavc_real(1))) {
+    return false;
+  }
+
+  return true;
 }
 
 static cavc::OffsetJoinType to_cpp_offset_join_type(cavc_offset_join_type join_type) {
@@ -70,7 +106,7 @@ static cavc::OffsetJoinType to_cpp_offset_join_type(cavc_offset_join_type join_t
     return cavc::OffsetJoinType::Bevel;
   }
   CAVC_ASSERT(false, "Unhandled offset join enum");
-  return cavc::OffsetJoinType::Round;
+  std::terminate();
 }
 
 static cavc::OffsetEndCapType to_cpp_offset_end_cap_type(cavc_offset_end_cap_type end_cap_type) {
@@ -83,14 +119,12 @@ static cavc::OffsetEndCapType to_cpp_offset_end_cap_type(cavc_offset_end_cap_typ
     return cavc::OffsetEndCapType::Butt;
   }
   CAVC_ASSERT(false, "Unhandled offset end cap enum");
-  return cavc::OffsetEndCapType::Round;
+  std::terminate();
 }
 
 static cavc::ParallelOffsetOptions<cavc_real>
 to_cpp_parallel_offset_options(cavc_parallel_offset_options const &options) {
-  if (options.join_type == CAVC_OFFSET_JOIN_MITER) {
-    CAVC_ASSERT(options.miter_limit >= cavc_real(1), "miter_limit must be >= 1");
-  }
+  CAVC_ASSERT(is_valid_parallel_offset_options(options), "invalid parallel offset options");
   cavc::ParallelOffsetOptions<cavc_real> result;
   result.hasSelfIntersects = options.may_have_self_intersects != 0;
   result.joinType = to_cpp_offset_join_type(options.join_type);
@@ -464,9 +498,13 @@ void cavc_parallel_offset(cavc_pline const *pline, cavc_real delta, cavc_pline_l
   CAVC_ASSERT(pline, "null pline not allowed");
   CAVC_ASSERT(output, "null output not allowed");
   CAVC_BEGIN_TRY_CATCH
+  *output = new cavc_pline_list();
+  if (!std::isfinite(delta) || !is_valid_parallel_offset_options(options)) {
+    return;
+  }
+
   auto cpp_options = to_cpp_parallel_offset_options(options);
   auto results = cavc::parallelOffset(pline->data, delta, cpp_options);
-  *output = new cavc_pline_list();
   move_to_list(std::move(results), *output);
   CAVC_END_TRY_CATCH
 }

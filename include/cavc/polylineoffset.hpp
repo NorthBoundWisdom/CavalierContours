@@ -2,6 +2,7 @@
 #define CAVC_POLYLINEOFFSET_HPP
 #include <algorithm>
 #include <cstdint>
+#include <cmath>
 #include <functional>
 
 #include "internal/plinesliceview.hpp"
@@ -1286,7 +1287,9 @@ std::vector<OpenPolylineSlice<Real>>
 dualSliceAtIntersectsForOffset(Polyline<Real> const &originalPline,
                                Polyline<Real> const &rawOffsetPline,
                                Polyline<Real> const &dualRawOffsetPline, Real offset,
-                               ParallelOffsetOptions<Real> const &options) {
+                               ParallelOffsetOptions<Real> const &options,
+                               bool enforceMinDistance = true,
+                               bool skipOrigIntersectionCheck = false) {
   std::vector<OpenPolylineSlice<Real>> result;
   if (rawOffsetPline.size() < 2) {
     return result;
@@ -1315,10 +1318,6 @@ dualSliceAtIntersectsForOffset(Polyline<Real> const &originalPline,
       intersectPointValidCache;
   std::vector<std::int8_t> rawVertexPointValidCache(rawOffsetPline.size(), -1);
   std::vector<std::int8_t> rawSegmentIntersectsOrigCache(rawOffsetPline.size(), -1);
-  // Keep open-polyline clipping conservative to avoid fragment loss around caps and near-tangent
-  // turns. Relaxation is only allowed for closed, non-round join handling.
-  const bool enforceMinDistance =
-      !originalPline.isClosed() || options.joinType == OffsetJoinType::Round;
   auto pointValid = [&](Vector2<Real> const &p) {
     if (!enforceMinDistance) {
       return true;
@@ -1417,6 +1416,10 @@ dualSliceAtIntersectsForOffset(Polyline<Real> const &originalPline,
   }
 
   auto intersectsOrigPline = [&](PlineVertex<Real> const &v1, PlineVertex<Real> const &v2) {
+    if (skipOrigIntersectionCheck) {
+      return false;
+    }
+
     AABB<Real> approxBB = createFastApproxBoundingBox(v1, v2);
     bool intersects = false;
     auto visitor = [&](std::size_t i) {
@@ -1702,6 +1705,51 @@ std::vector<Polyline<Real>> filterSimpleClosedLoops(std::vector<Polyline<Real>> 
   return filtered;
 }
 
+template <typename Real> struct OffsetResultQualityThresholds {
+  Real minPathLength;
+  Real minClosedAbsArea;
+  Real minRelaxedClosedAbsArea;
+};
+
+template <typename Real> Real finiteNonNegative(Real value) {
+  if (!std::isfinite(value) || value < Real(0)) {
+    return Real(0);
+  }
+
+  return value;
+}
+
+template <typename Real> Real polylineLengthScale(Polyline<Real> const &pline) {
+  auto const extents = getExtents(pline);
+  Real bboxDiagonal = Real(0);
+  if (std::isfinite(extents.xMin) && std::isfinite(extents.yMin) &&
+      std::isfinite(extents.xMax) && std::isfinite(extents.yMax)) {
+    bboxDiagonal = std::hypot(extents.xMax - extents.xMin, extents.yMax - extents.yMin);
+  }
+
+  return std::max({Real(1), finiteNonNegative(bboxDiagonal),
+                   finiteNonNegative(getPathLength(pline))});
+}
+
+template <typename Real>
+OffsetResultQualityThresholds<Real> offsetResultQualityThresholds(Polyline<Real> const &reference,
+                                                                  Real offset) {
+  Real const lengthScale = std::max(polylineLengthScale(reference), std::abs(offset));
+  // Keep the floor tied to runtime tolerances so small-coordinate workloads can still produce
+  // usable open offsets after callers tighten the epsilon config.
+  Real const tolerancePathFloor =
+      std::max({utils::realPrecision<Real>() * Real(10), utils::sliceJoinThreshold<Real>(),
+                utils::realThreshold<Real>() * Real(100)});
+  Real const minPathLength =
+      std::max(tolerancePathFloor, lengthScale * utils::realThreshold<Real>() * Real(100));
+  Real const referenceAbsArea = std::abs(getArea(reference));
+  Real const offsetAbsAreaScale = std::abs(offset * offset);
+  Real const minClosedAbsArea =
+      std::max(minPathLength * minPathLength, referenceAbsArea * Real(1e-8));
+  Real const minRelaxedClosedAbsArea = std::max(minClosedAbsArea, offsetAbsAreaScale);
+  return {minPathLength, minClosedAbsArea, minRelaxedClosedAbsArea};
+}
+
 template <typename Real>
 bool hasOnlyEndpointTouchIntersects(Polyline<Real> const &candidate) {
   if (!candidate.isClosed() || candidate.size() < 3) {
@@ -1729,15 +1777,17 @@ bool hasOnlyEndpointTouchIntersects(Polyline<Real> const &candidate) {
 }
 
 template <typename Real>
-std::vector<Polyline<Real>>
-filterClosedLoopsAllowingEndpointTouches(std::vector<Polyline<Real>> const &candidates) {
+std::vector<Polyline<Real>> filterClosedLoopsAllowingEndpointTouches(
+    std::vector<Polyline<Real>> const &candidates,
+    OffsetResultQualityThresholds<Real> const &qualityThresholds) {
   std::vector<Polyline<Real>> filtered;
   filtered.reserve(candidates.size());
   for (auto const &candidate : candidates) {
     if (!candidate.isClosed() || candidate.size() < 3) {
       continue;
     }
-    if (std::abs(getArea(candidate)) < Real(1e-4) || getPathLength(candidate) <= Real(1e-2)) {
+    if (getPathLength(candidate) <= qualityThresholds.minPathLength ||
+        std::abs(getArea(candidate)) < qualityThresholds.minClosedAbsArea) {
       continue;
     }
     if (!hasOnlyEndpointTouchIntersects(candidate)) {
@@ -1748,6 +1798,142 @@ filterClosedLoopsAllowingEndpointTouches(std::vector<Polyline<Real>> const &cand
   }
 
   return filtered;
+}
+
+template <typename Real> bool offsetResultVertexesAreFinite(Polyline<Real> const &candidate) {
+  for (auto const &vertex : candidate.vertexes()) {
+    if (!std::isfinite(vertex.x()) || !std::isfinite(vertex.y()) ||
+        !std::isfinite(vertex.bulge())) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+template <typename Real>
+bool isUsableOpenOffsetPolyline(Polyline<Real> const &candidate,
+                                OffsetResultQualityThresholds<Real> const &qualityThresholds) {
+  return !candidate.isClosed() && candidate.size() >= 2 &&
+         getPathLength(candidate) > qualityThresholds.minPathLength &&
+         offsetResultVertexesAreFinite(candidate);
+}
+
+template <typename Real>
+std::vector<Polyline<Real>> filterUsableOpenOffsetPolylines(
+    std::vector<Polyline<Real>> const &candidates,
+    OffsetResultQualityThresholds<Real> const &qualityThresholds) {
+  std::vector<Polyline<Real>> filtered;
+  filtered.reserve(candidates.size());
+  for (auto const &candidate : candidates) {
+    if (isUsableOpenOffsetPolyline(candidate, qualityThresholds)) {
+      filtered.push_back(candidate);
+    }
+  }
+
+  return filtered;
+}
+
+template <typename Real>
+std::vector<Polyline<Real>> filterClosedLoopsWithMinimumAbsArea(
+    std::vector<Polyline<Real>> const &candidates,
+    OffsetResultQualityThresholds<Real> const &qualityThresholds) {
+  std::vector<Polyline<Real>> filtered;
+  filtered.reserve(candidates.size());
+  for (auto const &candidate : candidates) {
+    if (!candidate.isClosed() || candidate.size() < 3) {
+      continue;
+    }
+    if (!offsetResultVertexesAreFinite(candidate)) {
+      continue;
+    }
+    if (getPathLength(candidate) <= qualityThresholds.minPathLength) {
+      continue;
+    }
+    if (std::abs(getArea(candidate)) + utils::realPrecision<Real>() <
+        qualityThresholds.minClosedAbsArea) {
+      continue;
+    }
+
+    filtered.push_back(candidate);
+  }
+
+  return filtered;
+}
+
+template <typename Real>
+std::vector<Polyline<Real>>
+stitchSlicesIntoSimpleClosedLoops(Polyline<Real> const &sourcePline,
+                                  std::vector<OpenPolylineSlice<Real>> const &slices,
+                                  std::size_t origMaxIndex,
+                                  Real joinThreshold = utils::sliceJoinThreshold<Real>());
+
+template <typename Real>
+std::vector<Polyline<Real>> recoverOpenOffsetPolylinesFromRelaxedSlices(
+    Polyline<Real> const &cleaned, Polyline<Real> const &rawOffset,
+    Polyline<Real> const &dualRawOffset, Real offset,
+    ParallelOffsetOptions<Real> const &options) {
+  CAVC_ASSERT(!cleaned.isClosed(), "relaxed open-offset recovery requires an open polyline");
+
+  auto const qualityThresholds = offsetResultQualityThresholds(cleaned, offset);
+  auto recoverFromSlices = [&](bool skipOrigIntersectionCheck) {
+    auto relaxedSlices = dualSliceAtIntersectsForOffset(cleaned, rawOffset, dualRawOffset, offset,
+                                                        options, false, skipOrigIntersectionCheck);
+    auto relaxedResult =
+        stitchOffsetSlicesTogether(rawOffset, relaxedSlices, cleaned.isClosed(), rawOffset.size() - 1);
+    return filterUsableOpenOffsetPolylines(relaxedResult, qualityThresholds);
+  };
+
+  auto recovered = recoverFromSlices(false);
+  if (!recovered.empty()) {
+    return recovered;
+  }
+
+  return recoverFromSlices(true);
+}
+
+template <typename Real>
+std::vector<Polyline<Real>> recoverClosedOffsetLoopsFromRelaxedSlices(
+    Polyline<Real> const &cleaned, Polyline<Real> const &rawOffset, Real offset) {
+  CAVC_ASSERT(cleaned.isClosed(), "relaxed closed-loop recovery requires a closed polyline");
+  if (rawOffset.size() < 2) {
+    return {};
+  }
+
+  auto qualityThresholds = offsetResultQualityThresholds(cleaned, offset);
+  qualityThresholds.minClosedAbsArea = qualityThresholds.minRelaxedClosedAbsArea;
+
+  auto recoverFromSlices = [&](bool skipOrigIntersectionCheck) {
+    auto relaxedSlices =
+        slicesFromRawOffset(cleaned, rawOffset, offset, false, skipOrigIntersectionCheck);
+    auto relaxedStitched =
+        stitchOffsetSlicesTogether(rawOffset, relaxedSlices, true, rawOffset.size() - 1);
+
+    auto simpleRecovered = filterClosedLoopsWithMinimumAbsArea(
+        filterSimpleClosedLoops(relaxedStitched), qualityThresholds);
+    if (!simpleRecovered.empty()) {
+      return simpleRecovered;
+    }
+
+    auto graphRecovered = stitchSlicesIntoSimpleClosedLoops(rawOffset, relaxedSlices, rawOffset.size() - 1);
+    auto graphFiltered = filterClosedLoopsWithMinimumAbsArea(graphRecovered, qualityThresholds);
+    if (!graphFiltered.empty()) {
+      return graphFiltered;
+    }
+
+    return filterClosedLoopsWithMinimumAbsArea(
+        filterClosedLoopsAllowingEndpointTouches(relaxedStitched, qualityThresholds),
+        qualityThresholds);
+  };
+
+  // First keep the original-intersection rejection enabled. If that still fails, relax only that
+  // final check, while retaining the non-round raw join geometry and area/path/finite filters.
+  auto recovered = recoverFromSlices(false);
+  if (!recovered.empty()) {
+    return recovered;
+  }
+
+  return recoverFromSlices(true);
 }
 
 template <typename Real>
@@ -1768,7 +1954,7 @@ std::vector<Polyline<Real>>
 stitchSlicesIntoSimpleClosedLoops(Polyline<Real> const &sourcePline,
                                   std::vector<OpenPolylineSlice<Real>> const &slices,
                                   std::size_t origMaxIndex,
-                                  Real joinThreshold = utils::sliceJoinThreshold<Real>()) {
+                                  Real joinThreshold) {
   std::vector<Polyline<Real>> result;
   if (slices.empty()) {
     return result;
@@ -1920,6 +2106,7 @@ std::vector<Polyline<Real>> parallelOffset(Polyline<Real> const &pline, Real off
   if (rawOffset.size() < 2) {
     return std::vector<Polyline<Real>>();
   }
+  auto const qualityThresholds = offsetResultQualityThresholds(cleaned, offset);
   if (cleaned.isClosed() && !options.hasSelfIntersects) {
     auto slices = slicesFromRawOffset(cleaned, rawOffset, offset);
     auto result =
@@ -1939,22 +2126,16 @@ std::vector<Polyline<Real>> parallelOffset(Polyline<Real> const &pline, Real off
       return rescuedResult;
     }
 
-    auto endpointTouchResult = filterClosedLoopsAllowingEndpointTouches(result);
+    auto endpointTouchResult = filterClosedLoopsAllowingEndpointTouches(result, qualityThresholds);
     if (!endpointTouchResult.empty()) {
       return endpointTouchResult;
     }
 
-    auto tryRoundFallback = [&]() {
-      ParallelOffsetOptions<Real> fallbackOptions = options;
-      fallbackOptions.joinType = OffsetJoinType::Round;
-      auto fallbackResult = parallelOffset(cleaned, offset, fallbackOptions);
-      return filterSimpleClosedLoops(fallbackResult);
-    };
-
     if (options.joinType != OffsetJoinType::Round) {
-      auto roundFallback = tryRoundFallback();
-      if (!roundFallback.empty()) {
-        return roundFallback;
+      auto relaxedRecoveredResult =
+          recoverClosedOffsetLoopsFromRelaxedSlices(cleaned, rawOffset, offset);
+      if (!relaxedRecoveredResult.empty()) {
+        return relaxedRecoveredResult;
       }
     }
 
@@ -1963,11 +2144,27 @@ std::vector<Polyline<Real>> parallelOffset(Polyline<Real> const &pline, Real off
 
   // not closed polyline or has self intersects, must apply dual clipping
   auto dualRawOffset = createRawOffsetPline(cleaned, -offset, options);
-  auto slices = dualSliceAtIntersectsForOffset(cleaned, rawOffset, dualRawOffset, offset, options);
+  bool const enforceMinDistance =
+      !cleaned.isClosed() || options.joinType == OffsetJoinType::Round;
+  auto slices = dualSliceAtIntersectsForOffset(cleaned, rawOffset, dualRawOffset, offset, options,
+                                               enforceMinDistance);
   auto result =
       stitchOffsetSlicesTogether(rawOffset, slices, cleaned.isClosed(), rawOffset.size() - 1);
   if (!cleaned.isClosed()) {
-    return result;
+    auto filteredOpenResult = filterUsableOpenOffsetPolylines(result, qualityThresholds);
+    if (!filteredOpenResult.empty()) {
+      return filteredOpenResult;
+    }
+
+    if (options.joinType != OffsetJoinType::Round) {
+      auto relaxedOpenResult = recoverOpenOffsetPolylinesFromRelaxedSlices(
+          cleaned, rawOffset, dualRawOffset, offset, options);
+      if (!relaxedOpenResult.empty()) {
+        return relaxedOpenResult;
+      }
+    }
+
+    return {};
   }
 
   auto filteredResult = filterSimpleClosedLoops(result);
@@ -1985,9 +2182,17 @@ std::vector<Polyline<Real>> parallelOffset(Polyline<Real> const &pline, Real off
     return rescuedResult;
   }
 
-  auto endpointTouchResult = filterClosedLoopsAllowingEndpointTouches(result);
+  auto endpointTouchResult = filterClosedLoopsAllowingEndpointTouches(result, qualityThresholds);
   if (!endpointTouchResult.empty()) {
     return endpointTouchResult;
+  }
+
+  if (cleaned.isClosed() && options.joinType != OffsetJoinType::Round) {
+    auto relaxedRecoveredResult =
+        recoverClosedOffsetLoopsFromRelaxedSlices(cleaned, rawOffset, offset);
+    if (!relaxedRecoveredResult.empty()) {
+      return relaxedRecoveredResult;
+    }
   }
 
   return std::vector<Polyline<Real>>();

@@ -13,6 +13,7 @@ C++14 header only library (with a C API available) for processing 2D polylines c
 - [Summary](#summary)
 - [Table of Contents](#table-of-contents)
 - [Quick Code Example](#quick-code-example)
+- [Parallel Offset Join and End-Cap Semantics](#parallel-offset-join-and-end-cap-semantics)
 - [Polyline Structure](#polyline-structure)
 - [Other Programming Languages](#other-programming-languages)
 - [Offset Algorithm and Stepwise Example](#offset-algorithm-and-stepwise-example)
@@ -63,6 +64,25 @@ input.isClosed() = true;
 std::vector<cavc::Polyline<double>> results = cavc::parallelOffset(input, 3.0);
 ```
 NOTE: If the offset results are wrong in some way you may need to adjust the scale of the numbers, e.g. scale the inputs up by 1000 (by multiplying all the X and Y components of the vertexes by 1000), perform the offset (with the offset value also scaled up by 1000), and then scale the output result back down by 1000. This is due the fixed bit representation of floating point numbers and the absolute float comparing and thresholding used by the algorithm.
+
+# Parallel Offset Join and End-Cap Semantics
+
+`parallelOffset` accepts `ParallelOffsetOptions` in the C++ API and `cavc_parallel_offset_options` in the C API. The default remains the original behavior: rounded joins and rounded end caps.
+
+Join behavior is local to the raw offset segment connection:
+
+- `Round` uses the original rounded raw-offset join behavior for line and arc segments.
+- `Miter` intersects adjacent raw-offset segment tangents and clips the miter by `miterLimit`. When the miter limit is exceeded, that local join is beveled. This is standard miter-limit behavior rather than an offset failure fallback.
+- `Bevel` connects adjacent raw-offset endpoints directly with a bevel segment.
+- Arc-involved non-round joins use endpoint tangent intersection. Collapsed arcs degrade locally to bevel because the collapsed segment has no stable tangent-preserving miter. The offset algorithm does not fall back from a failed closed `Miter`/`Bevel` offset to rounded output.
+
+End-cap behavior applies only to open polyline offsets and operates on the returned open offset curve. These end caps do not generate a closed outline cap face.
+
+- `Round` uses endpoint-circle clipping.
+- `Square` extends each open endpoint along the endpoint tangent by `abs(offset)` and adjusts clipping consistently for line and arc start/end segments.
+- `Butt` uses endpoint-normal line clipping.
+
+The C API rejects invalid offset options by returning an allocated empty output list. This includes unknown join/end-cap enum values, non-finite `delta`, and `miter_limit < 1` when `join_type` is `CAVC_OFFSET_JOIN_MITER`. It does not silently reinterpret invalid values as rounded joins or end caps.
 
 # Polyline Structure
 Polylines are defined by a sequence of vertexes and a bool indicating whether the polyline is closed or open. Each vertex has a 2D position (x and y) as well as a bulge value. Bulge is used to define arcs, where `bulge = tan(theta/4)`. `theta` is the arc sweep angle from the starting vertex position to the next vertex position. If the polyline is closed then the last vertex connects to the first vertex, otherwise it does not (and the last vertex bulge value is unused). See [[2]](#references) for more details regarding bulge calculations.
@@ -217,6 +237,40 @@ When stitching open polylines together the current implementation attempts to st
 
 # Development
 Pull requests, feature requests/ideas, issues, and bug reports are welcome. Please attempt to follow the code style and apply clang-format (using the .clang-format file) before making a pull request.
+
+Common CMake options:
+
+```text
+CAVC_HEADER_ONLY=ON|OFF
+CAVC_BUILD_SHARED_LIB=ON|OFF
+CAVC_BUILD_TESTS=ON|OFF
+CAVC_BUILD_BENCHMARKS=ON|OFF
+CAVC_GTEST_SOURCE_DIR=/path/to/googletest
+CAVC_BENCHMARK_SOURCE_DIR=/path/to/google-benchmark
+```
+
+Example local test build with vendored or unpacked googletest source:
+
+```bash
+cmake -S . -B build -G Ninja \
+  -DCAVC_BUILD_TESTS=ON \
+  -DCAVC_BUILD_BENCHMARKS=OFF \
+  -DCAVC_GTEST_SOURCE_DIR=/path/to/googletest
+cmake --build build
+ctest --test-dir build --output-on-failure
+```
+
+Example benchmark build:
+
+```bash
+cmake -S . -B build-bench -G Ninja \
+  -DCAVC_BUILD_TESTS=OFF \
+  -DCAVC_BUILD_BENCHMARKS=ON \
+  -DCAVC_BENCHMARK_SOURCE_DIR=/path/to/benchmark \
+  -DCMAKE_BUILD_TYPE=Release
+cmake --build build-bench
+./build-bench/offsethardeningbenchmarks --benchmark_min_time=0.01s
+```
 
 # API Stability
 There is not an official release yet - all functions and structures are subject to change. This repository for now serves as an implementation reference that is easy to understand and possibly transcribe to other programming languages. The code can be used as is, but there is no guarantee that future development will maintain the same functions and structures. Ideas/pull requests for what a stable API interface should look like are welcome.

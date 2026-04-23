@@ -252,16 +252,22 @@ cavc_offset_loop_topology_get(cavc_offset_loop_topology const *topology, uint32_
 CAVC_API cavc_parallel_offset_options cavc_parallel_offset_default_options(void);
 
 // Generates the parallel offset of a polyline. delta is the offset delta, output is filled with
-// the result.
+// the result. Invalid offset options (unknown join/end-cap enum, non-finite delta, or
+// miter_limit < 1 when join_type is miter) produce an allocated empty output list instead of
+// silently falling back to another join/end-cap type.
 // Join support:
-// - round: lines and arcs
-// - miter/bevel: line-line joins and arc-involved joins
-//   (arc-involved joins use endpoint tangents; collapsed-arc joins degrade to bevel)
-// - miter_limit applies when join_type is miter (must be >= 1)
-// End cap support:
-// - round/butt: supported
-//   (butt uses endpoint-normal line clipping, round uses endpoint circles)
-// - square: open polylines with line/arc start/end segments
+// - round: the original rounded raw-offset join behavior for lines and arcs
+// - miter: intersects adjacent raw-offset tangents and clips to miter_limit; when the miter limit
+//   is exceeded, the local join is beveled as standard miter-limit behavior
+// - bevel: connects adjacent raw-offset endpoints directly with a bevel segment
+// - arc-involved non-round joins use endpoint tangents; collapsed-arc joins degrade locally to
+//   bevel because no stable tangent-preserving miter exists for the collapsed segment
+// End cap support for open polylines:
+// - round: endpoint-circle clipping
+// - square: endpoint-tangent extension by abs(delta), including line/arc start/end segments
+// - butt: endpoint-normal line clipping
+// These end caps operate on the returned open offset curve. They do not generate a closed outline
+// cap face.
 CAVC_API void cavc_parallel_offset(cavc_pline const *pline, cavc_real delta,
                                    cavc_pline_list **output, cavc_parallel_offset_options options);
 

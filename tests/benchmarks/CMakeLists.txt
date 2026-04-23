@@ -6,7 +6,9 @@ if(CAVC_ENABLE_CLIPPER_BENCHMARKS)
     include(clipper.cmake)
 endif()
 
-find_package(benchmark REQUIRED)
+if(NOT TARGET benchmark::benchmark)
+    find_package(benchmark REQUIRED)
+endif()
 
 macro(add_benchmark name)
     add_executable(${name} ${name}.cpp)
@@ -29,6 +31,7 @@ endmacro()
 
 add_benchmark(offsetbenchmarks)
 add_benchmark(offsetislandsbenchmarks)
+add_benchmark(offsethardeningbenchmarks)
 add_benchmark(spatialindexbenchmarks)
 add_benchmark(extentsbenchmarks)
 add_benchmark(areabenchmarks)

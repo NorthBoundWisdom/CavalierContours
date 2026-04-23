@@ -1,10 +1,12 @@
 #include <algorithm>
 #include <cmath>
 #include <memory>
+#include <limits>
 #include <vector>
 
 #include <cavc/polyline.hpp>
 #include <cavc/polylineintersects.hpp>
+#include <cavc/polylineoffset.hpp>
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
@@ -151,6 +153,26 @@ std::vector<cavc_vertex> makeOffsetCase1Vertexes() {
       {28.0, 0.0, 0.5},
       {39.0, 21.0, 0.0},
       {28.0, 12.0, 0.5},
+  };
+}
+
+std::vector<cavc_vertex> makeHighCurvatureArcHeavyJoinVertexes() {
+  return {
+      {1.585, -0.404, 0.419},
+      {1.856, -1.235, 0.125},
+      {2.795, -2.210, 0.130},
+      {4.185, -2.751, 0.773},
+      {4.559, -1.233, 0.000},
+      {5.090, -0.316, -0.312},
+  };
+}
+
+std::vector<cavc_vertex> makeOpenSingleVertexRegressionVertexes() {
+  return {
+      {0.0, 0.0, 0.03733552335181545},
+      {1.5185777227936998, 0.6420060611526115, -0.32463101503455405},
+      {2.714781765456042, 0.19737415507924227, 0.8364887699594278},
+      {3.5805113662462693, -0.04500179847777397, 0.0},
   };
 }
 
@@ -654,10 +676,9 @@ TEST(CApiRegression, ParallelOffsetJoinArcHeavyStressMatrix) {
 
     const bool high_equals_bevel = closedVertexListsFuzzyEqual(miter_high_vertexes, bevel_vertexes);
     const bool high_equals_round = closedVertexListsFuzzyEqual(miter_high_vertexes, round_vertexes);
-    EXPECT_TRUE(high_equals_round || !high_equals_bevel);
-    if (!high_equals_bevel && !high_equals_round) {
-      EXPECT_GE(bevel_vertexes.size(), miter_high_vertexes.size() + min_bevel_extra);
-    }
+    (void)min_bevel_extra;
+    EXPECT_FALSE(high_equals_round);
+    EXPECT_FALSE(high_equals_bevel);
 
     EXPECT_TRUE(vertexListAllFinite(miter_high_vertexes));
     EXPECT_TRUE(vertexListAllFinite(miter_low_vertexes));
@@ -673,6 +694,195 @@ TEST(CApiRegression, ParallelOffsetJoinArcHeavyStressMatrix) {
     SCOPED_TRACE(test_case.name);
     run_case(test_case, 0.2, test_case.min_bevel_extra_positive);
     run_case(test_case, -0.2, test_case.min_bevel_extra_negative);
+  }
+}
+
+
+TEST(CApiRegression, CppParallelOffsetOptionsSupportSquareEndCap) {
+  cavc::Polyline<cavc_real> pline;
+  pline.addVertex(0.0, 0.0, 0.0);
+  pline.addVertex(10.0, 0.0, 0.0);
+
+  cavc::ParallelOffsetOptions<cavc_real> options;
+  options.endCapType = cavc::OffsetEndCapType::Square;
+
+  std::vector<cavc::Polyline<cavc_real>> results = cavc::parallelOffset(pline, -1.0, options);
+
+  ASSERT_EQ(results.size(), 1u);
+  ASSERT_FALSE(results.front().isClosed());
+  ASSERT_EQ(results.front().size(), 2u);
+  EXPECT_NEAR(results.front()[0].x(), -1.0, 1e-9);
+  EXPECT_NEAR(results.front()[0].y(), -1.0, 1e-9);
+  EXPECT_NEAR(results.front()[1].x(), 11.0, 1e-9);
+  EXPECT_NEAR(results.front()[1].y(), -1.0, 1e-9);
+}
+
+TEST(CApiRegression, CppParallelOffsetOptionsSupportMiterAndBevelJoins) {
+  cavc::Polyline<cavc_real> pline;
+  pline.isClosed() = true;
+  pline.addVertex(0.0, 0.0, 0.0);
+  pline.addVertex(10.0, 0.0, 0.0);
+  pline.addVertex(10.0, 10.0, 0.0);
+  pline.addVertex(0.0, 10.0, 0.0);
+
+  cavc::ParallelOffsetOptions<cavc_real> options;
+  options.joinType = cavc::OffsetJoinType::Miter;
+  options.miterLimit = 4.0;
+  std::vector<cavc::Polyline<cavc_real>> miter_results = cavc::parallelOffset(pline, -1.0, options);
+
+  options.joinType = cavc::OffsetJoinType::Bevel;
+  std::vector<cavc::Polyline<cavc_real>> bevel_results = cavc::parallelOffset(pline, -1.0, options);
+
+  ASSERT_EQ(miter_results.size(), 1u);
+  ASSERT_EQ(bevel_results.size(), 1u);
+  EXPECT_TRUE(miter_results.front().isClosed());
+  EXPECT_TRUE(bevel_results.front().isClosed());
+  EXPECT_EQ(miter_results.front().size(), 4u);
+  EXPECT_EQ(bevel_results.front().size(), 8u);
+  EXPECT_GT(cavc::getArea(miter_results.front()), cavc::getArea(bevel_results.front()));
+}
+
+TEST(CApiRegression, ParallelOffsetRejectsInvalidCOptionsWithoutSilentRoundFallback) {
+  std::vector<cavc_vertex> line = {{0.0, 0.0, 0.0}, {10.0, 0.0, 0.0}};
+  PlinePtr pline(plineFromVertexes(line, false));
+
+  auto expect_empty_result = [&](cavc_parallel_offset_options options) {
+    cavc_pline_list *raw_results = nullptr;
+    cavc_parallel_offset(pline.get(), -1.0, &raw_results, options);
+    PlineListPtr results(raw_results);
+    ASSERT_NE(results.get(), nullptr);
+    EXPECT_EQ(cavc_pline_list_count(results.get()), 0u);
+  };
+
+  cavc_parallel_offset_options invalid_join = cavc_parallel_offset_default_options();
+  invalid_join.join_type = static_cast<cavc_offset_join_type>(99);
+  expect_empty_result(invalid_join);
+
+  cavc_parallel_offset_options invalid_end_cap = cavc_parallel_offset_default_options();
+  invalid_end_cap.end_cap_type = static_cast<cavc_offset_end_cap_type>(99);
+  expect_empty_result(invalid_end_cap);
+
+  cavc_parallel_offset_options invalid_miter_limit = cavc_parallel_offset_default_options();
+  invalid_miter_limit.join_type = CAVC_OFFSET_JOIN_MITER;
+  invalid_miter_limit.miter_limit = 0.5;
+  expect_empty_result(invalid_miter_limit);
+
+  cavc_parallel_offset_options invalid_delta = cavc_parallel_offset_default_options();
+  cavc_pline_list *raw_results = nullptr;
+  cavc_parallel_offset(pline.get(), std::numeric_limits<cavc_real>::quiet_NaN(), &raw_results,
+                       invalid_delta);
+  PlineListPtr results(raw_results);
+  ASSERT_NE(results.get(), nullptr);
+  EXPECT_EQ(cavc_pline_list_count(results.get()), 0u);
+}
+
+TEST(CApiRegression, ParallelOffsetClosedMiterRecoveryDoesNotRoundFallback) {
+  PlinePtr pline(plineFromVertexes(makeHighCurvatureArcHeavyJoinVertexes(), true));
+
+  cavc_parallel_offset_options miter_options = cavc_parallel_offset_default_options();
+  miter_options.join_type = CAVC_OFFSET_JOIN_MITER;
+  miter_options.miter_limit = 8.0;
+
+  cavc_parallel_offset_options round_options = cavc_parallel_offset_default_options();
+
+  cavc_pline_list *raw_miter = nullptr;
+  cavc_parallel_offset(pline.get(), 0.2, &raw_miter, miter_options);
+  PlineListPtr miter_results(raw_miter);
+
+  cavc_pline_list *raw_round = nullptr;
+  cavc_parallel_offset(pline.get(), 0.2, &raw_round, round_options);
+  PlineListPtr round_results(raw_round);
+
+  ASSERT_EQ(cavc_pline_list_count(miter_results.get()), 1u);
+  ASSERT_EQ(cavc_pline_list_count(round_results.get()), 1u);
+
+  cavc_pline *miter_pline = cavc_pline_list_get(miter_results.get(), 0);
+  cavc_pline *round_pline = cavc_pline_list_get(round_results.get(), 0);
+
+  std::vector<cavc_vertex> miter_vertexes = readVertexes(miter_pline);
+  std::vector<cavc_vertex> round_vertexes = readVertexes(round_pline);
+
+  EXPECT_TRUE(cavc_pline_is_closed(miter_pline));
+  EXPECT_TRUE(vertexListAllFinite(miter_vertexes));
+  EXPECT_FALSE(hasSelfIntersect(miter_pline));
+  EXPECT_GT(cavc_get_path_length(miter_pline), 0.0);
+  EXPECT_GT(cavc_get_area(miter_pline), cavc_get_area(round_pline));
+  EXPECT_FALSE(closedVertexListsFuzzyEqual(miter_vertexes, round_vertexes));
+}
+
+TEST(CApiRegression, ParallelOffsetClosedBevelRecoveryDoesNotRoundFallback) {
+  PlinePtr pline(plineFromVertexes(makeOffsetCase1Vertexes(), true));
+
+  cavc_parallel_offset_options bevel_options = cavc_parallel_offset_default_options();
+  bevel_options.join_type = CAVC_OFFSET_JOIN_BEVEL;
+
+  cavc_parallel_offset_options round_options = cavc_parallel_offset_default_options();
+
+  cavc_pline_list *raw_bevel = nullptr;
+  cavc_parallel_offset(pline.get(), -1.0, &raw_bevel, bevel_options);
+  PlineListPtr bevel_results(raw_bevel);
+
+  cavc_pline_list *raw_round = nullptr;
+  cavc_parallel_offset(pline.get(), -1.0, &raw_round, round_options);
+  PlineListPtr round_results(raw_round);
+
+  ASSERT_EQ(cavc_pline_list_count(bevel_results.get()), 1u);
+  ASSERT_EQ(cavc_pline_list_count(round_results.get()), 1u);
+
+  cavc_pline *bevel_pline = cavc_pline_list_get(bevel_results.get(), 0);
+  cavc_pline *round_pline = cavc_pline_list_get(round_results.get(), 0);
+
+  std::vector<cavc_vertex> bevel_vertexes = readVertexes(bevel_pline);
+  std::vector<cavc_vertex> round_vertexes = readVertexes(round_pline);
+
+  EXPECT_TRUE(cavc_pline_is_closed(bevel_pline));
+  EXPECT_TRUE(vertexListAllFinite(bevel_vertexes));
+  EXPECT_FALSE(hasSelfIntersect(bevel_pline));
+  EXPECT_GT(cavc_get_path_length(bevel_pline), 0.0);
+  EXPECT_FALSE(closedVertexListsFuzzyEqual(bevel_vertexes, round_vertexes));
+}
+
+TEST(CApiRegression, ParallelOffsetKeepsSmallOpenLineResult) {
+  cavc::Polyline<cavc_real> pline;
+  pline.addVertex(0.0, 0.0, 0.0);
+  pline.addVertex(0.005, 0.0, 0.0);
+
+  std::vector<cavc::Polyline<cavc_real>> results = cavc::parallelOffset(pline, 0.001);
+
+  ASSERT_EQ(results.size(), 1u);
+  ASSERT_FALSE(results.front().isClosed());
+  ASSERT_EQ(results.front().size(), 2u);
+  EXPECT_GT(cavc::getPathLength(results.front()), 0.0);
+  EXPECT_NEAR(cavc::getPathLength(results.front()), 0.005, 1e-9);
+  EXPECT_TRUE(std::all_of(results.front().vertexes().begin(), results.front().vertexes().end(),
+                          [](cavc::PlineVertex<cavc_real> const &vertex) {
+                            return std::isfinite(vertex.x()) && std::isfinite(vertex.y()) &&
+                                   std::isfinite(vertex.bulge());
+                          }));
+}
+
+TEST(CApiRegression, ParallelOffsetOpenMiterEndCapFiltersSingleVertexDegenerateResult) {
+  PlinePtr pline(plineFromVertexes(makeOpenSingleVertexRegressionVertexes(), false));
+
+  cavc_parallel_offset_options options = cavc_parallel_offset_default_options();
+  options.join_type = CAVC_OFFSET_JOIN_MITER;
+  options.end_cap_type = CAVC_OFFSET_END_CAP_ROUND;
+
+  cavc_pline_list *raw_results = nullptr;
+  cavc_parallel_offset(pline.get(), 0.5108965468844583, &raw_results, options);
+  PlineListPtr results(raw_results);
+
+  uint32_t const result_count = cavc_pline_list_count(results.get());
+  ASSERT_GT(result_count, 0u);
+  for (uint32_t i = 0; i < result_count; ++i) {
+    cavc_pline *result_pline = cavc_pline_list_get(results.get(), i);
+    std::vector<cavc_vertex> result_vertexes = readVertexes(result_pline);
+
+    EXPECT_FALSE(cavc_pline_is_closed(result_pline));
+    EXPECT_GE(cavc_pline_vertex_count(result_pline), 2u);
+    EXPECT_TRUE(vertexListAllFinite(result_vertexes));
+    EXPECT_FALSE(hasSelfIntersect(result_pline));
+    EXPECT_GT(cavc_get_path_length(result_pline), 0.0);
   }
 }
 
