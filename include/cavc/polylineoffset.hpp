@@ -280,6 +280,136 @@ PlineVertex<Real> createTrimmedNextJoinStart(PlineOffsetSegment<Real> const &s2,
 }
 
 template <typename Real>
+bool miterLimitAllowsPoint(PlineOffsetSegment<Real> const &s1, Vector2<Real> const &point,
+                           Real miterLimit) {
+  Real offsetDist = length(s1.v2.pos() - s1.origV2Pos);
+  if (offsetDist <= utils::realThreshold<Real>()) {
+    return false;
+  }
+
+  Real miterDist = length(point - s1.origV2Pos);
+  return miterDist / offsetDist <= miterLimit + utils::realPrecision<Real>();
+}
+
+template <typename Real>
+bool tryAddExactNonRoundArcJoin(PlineOffsetSegment<Real> const &s1,
+                                PlineOffsetSegment<Real> const &s2, Real miterLimit,
+                                Polyline<Real> &result) {
+  const bool s1IsLine = s1.v1.bulgeIsZero();
+  const bool s2IsLine = s2.v1.bulgeIsZero();
+  Real const eps = utils::realPrecision<Real>();
+
+  auto betterCandidate = [&](bool &found, Vector2<Real> &best, Vector2<Real> const &candidate) {
+    if (!miterLimitAllowsPoint(s1, candidate, miterLimit)) {
+      return;
+    }
+
+    if (!found || distSquared(candidate, s1.origV2Pos) < distSquared(best, s1.origV2Pos)) {
+      best = candidate;
+      found = true;
+    }
+  };
+
+  bool found = false;
+  Vector2<Real> best = Vector2<Real>::zero();
+
+  if (s1IsLine && !s2IsLine) {
+    auto arc = arcRadiusAndCenter(s2.v1, s2.v2);
+    auto addIfValid = [&](Real t) {
+      if (t < -eps) {
+        return;
+      }
+
+      Vector2<Real> candidate = pointFromParametric(s1.v1.pos(), s1.v2.pos(), t);
+      if (pointWithinArcSweepAngle(arc.center, s2.v1.pos(), s2.v2.pos(), s2.v1.bulge(),
+                                   candidate, eps)) {
+        betterCandidate(found, best, candidate);
+      }
+    };
+
+    auto intrResult = intrLineSeg2Circle2(s1.v1.pos(), s1.v2.pos(), arc.radius, arc.center);
+    if (intrResult.numIntersects > 0) {
+      addIfValid(intrResult.t0);
+    }
+    if (intrResult.numIntersects > 1) {
+      addIfValid(intrResult.t1);
+    }
+
+    if (found) {
+      addOrReplaceIfSamePos(result, createTrimmedNextJoinStart(s2, best));
+      return true;
+    }
+
+    return false;
+  }
+
+  if (!s1IsLine && s2IsLine) {
+    auto arc = arcRadiusAndCenter(s1.v1, s1.v2);
+    auto addIfValid = [&](Real t) {
+      if (t > Real(1) + eps) {
+        return;
+      }
+
+      Vector2<Real> candidate = pointFromParametric(s2.v1.pos(), s2.v2.pos(), t);
+      if (pointWithinArcSweepAngle(arc.center, s1.v1.pos(), s1.v2.pos(), s1.v1.bulge(),
+                                   candidate, eps)) {
+        betterCandidate(found, best, candidate);
+      }
+    };
+
+    auto intrResult = intrLineSeg2Circle2(s2.v1.pos(), s2.v2.pos(), arc.radius, arc.center);
+    if (intrResult.numIntersects > 0) {
+      addIfValid(intrResult.t0);
+    }
+    if (intrResult.numIntersects > 1) {
+      addIfValid(intrResult.t1);
+    }
+
+    if (found) {
+      trimPreviousJoinSegmentAtPoint(s1, best, result);
+      return true;
+    }
+
+    return false;
+  }
+
+  if (!s1IsLine && !s2IsLine) {
+    auto arc1 = arcRadiusAndCenter(s1.v1, s1.v2);
+    auto arc2 = arcRadiusAndCenter(s2.v1, s2.v2);
+    auto addIfValid = [&](Vector2<Real> const &candidate) {
+      if (pointWithinArcSweepAngle(arc1.center, s1.v1.pos(), s1.v2.pos(), s1.v1.bulge(),
+                                   candidate, eps) &&
+          pointWithinArcSweepAngle(arc2.center, s2.v1.pos(), s2.v2.pos(), s2.v1.bulge(),
+                                   candidate, eps)) {
+        betterCandidate(found, best, candidate);
+      }
+    };
+
+    auto intrResult = intrCircle2Circle2(arc1.radius, arc1.center, arc2.radius, arc2.center);
+    switch (intrResult.intrType) {
+    case Circle2Circle2IntrType::NoIntersect:
+    case Circle2Circle2IntrType::Coincident:
+      break;
+    case Circle2Circle2IntrType::OneIntersect:
+      addIfValid(intrResult.point1);
+      break;
+    case Circle2Circle2IntrType::TwoIntersects:
+      addIfValid(intrResult.point1);
+      addIfValid(intrResult.point2);
+      break;
+    }
+
+    if (found) {
+      trimPreviousJoinSegmentAtPoint(s1, best, result);
+      addOrReplaceIfSamePos(result, createTrimmedNextJoinStart(s2, best));
+      return true;
+    }
+  }
+
+  return false;
+}
+
+template <typename Real>
 void nonRoundArcJoin(PlineOffsetSegment<Real> const &s1, PlineOffsetSegment<Real> const &s2,
                      OffsetJoinType joinType, Real miterLimit, Polyline<Real> &result) {
   CAVC_ASSERT(joinType != OffsetJoinType::Round, "use round join functions for round joins");
@@ -295,26 +425,34 @@ void nonRoundArcJoin(PlineOffsetSegment<Real> const &s1, PlineOffsetSegment<Real
   }
 
   CAVC_ASSERT(joinType == OffsetJoinType::Miter, "unsupported non-round join type");
+  if (tryAddExactNonRoundArcJoin(s1, s2, miterLimit, result)) {
+    return;
+  }
+
   Vector2<Real> miterPoint;
   if (!tryComputeMiterPointForArcJoin(s1, s2, miterPoint)) {
     connectUsingBevel();
     return;
   }
 
-  Real offsetDist = length(s1.v2.pos() - s1.origV2Pos);
-  if (offsetDist <= utils::realThreshold<Real>()) {
+  if (!miterLimitAllowsPoint(s1, miterPoint, miterLimit)) {
     connectUsingBevel();
     return;
   }
 
-  Real miterDist = length(miterPoint - s1.origV2Pos);
-  if (miterDist / offsetDist > miterLimit + utils::realPrecision<Real>()) {
-    connectUsingBevel();
-    return;
+  // A tangent-line miter point for an arc-involved join is generally not on the offset circle.
+  // Using it as an arc endpoint corrupts the bulge representation and can generate unstable
+  // spikes/self-intersections after slicing. Preserve arc endpoints and connect them with straight
+  // miter bridge legs; line segments are still extended/trimmed directly to the miter point.
+  if (!s1.v1.bulgeIsZero()) {
+    addOrReplaceIfSamePos(result, PlineVertex<Real>(s1.v2.pos(), Real(0)));
   }
 
-  trimPreviousJoinSegmentAtPoint(s1, miterPoint, result);
-  addOrReplaceIfSamePos(result, createTrimmedNextJoinStart(s2, miterPoint));
+  addOrReplaceIfSamePos(result, PlineVertex<Real>(miterPoint, Real(0)));
+
+  if (!s2.v1.bulgeIsZero()) {
+    addOrReplaceIfSamePos(result, s2.v1);
+  }
 }
 
 template <typename Real>
@@ -1835,6 +1973,41 @@ std::vector<Polyline<Real>> filterUsableOpenOffsetPolylines(
 }
 
 template <typename Real>
+std::vector<Polyline<Real>> keepDominantOpenOffsetPolyline(
+    std::vector<Polyline<Real>> const &candidates,
+    OffsetResultQualityThresholds<Real> const &qualityThresholds) {
+  if (candidates.size() < 2) {
+    return candidates;
+  }
+
+  std::size_t bestIndex = 0;
+  Real bestLength = getPathLength(candidates[0]);
+  Real secondBestLength = Real(0);
+  for (std::size_t i = 1; i < candidates.size(); ++i) {
+    Real const candidateLength = getPathLength(candidates[i]);
+    if (candidateLength > bestLength) {
+      secondBestLength = bestLength;
+      bestLength = candidateLength;
+      bestIndex = i;
+    } else if (candidateLength > secondBestLength) {
+      secondBestLength = candidateLength;
+    }
+  }
+
+  Real const dominanceThreshold = std::max(qualityThresholds.minPathLength * Real(10),
+                                           secondBestLength * Real(4));
+  if (bestLength <= dominanceThreshold) {
+    return candidates;
+  }
+
+  std::vector<Polyline<Real>> result;
+  result.reserve(1);
+  result.push_back(candidates[bestIndex]);
+  return result;
+}
+
+
+template <typename Real>
 std::vector<Polyline<Real>> filterClosedLoopsWithMinimumAbsArea(
     std::vector<Polyline<Real>> const &candidates,
     OffsetResultQualityThresholds<Real> const &qualityThresholds) {
@@ -1881,7 +2054,8 @@ std::vector<Polyline<Real>> recoverOpenOffsetPolylinesFromRelaxedSlices(
                                                         options, false, skipOrigIntersectionCheck);
     auto relaxedResult =
         stitchOffsetSlicesTogether(rawOffset, relaxedSlices, cleaned.isClosed(), rawOffset.size() - 1);
-    return filterUsableOpenOffsetPolylines(relaxedResult, qualityThresholds);
+    return keepDominantOpenOffsetPolyline(
+        filterUsableOpenOffsetPolylines(relaxedResult, qualityThresholds), qualityThresholds);
   };
 
   auto recovered = recoverFromSlices(false);
@@ -2152,6 +2326,10 @@ std::vector<Polyline<Real>> parallelOffset(Polyline<Real> const &pline, Real off
       stitchOffsetSlicesTogether(rawOffset, slices, cleaned.isClosed(), rawOffset.size() - 1);
   if (!cleaned.isClosed()) {
     auto filteredOpenResult = filterUsableOpenOffsetPolylines(result, qualityThresholds);
+    if (options.joinType != OffsetJoinType::Round) {
+      filteredOpenResult =
+          keepDominantOpenOffsetPolyline(filteredOpenResult, qualityThresholds);
+    }
     if (!filteredOpenResult.empty()) {
       return filteredOpenResult;
     }

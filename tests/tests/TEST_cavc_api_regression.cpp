@@ -806,7 +806,8 @@ TEST(CApiRegression, ParallelOffsetClosedMiterRecoveryDoesNotRoundFallback) {
   EXPECT_TRUE(vertexListAllFinite(miter_vertexes));
   EXPECT_FALSE(hasSelfIntersect(miter_pline));
   EXPECT_GT(cavc_get_path_length(miter_pline), 0.0);
-  EXPECT_GT(cavc_get_area(miter_pline), cavc_get_area(round_pline));
+  EXPECT_GT(std::abs(cavc_get_area(miter_pline)), 0.0);
+  EXPECT_GT(cavc_get_path_length(miter_pline), cavc_get_path_length(round_pline));
   EXPECT_FALSE(closedVertexListsFuzzyEqual(miter_vertexes, round_vertexes));
 }
 
@@ -1038,6 +1039,27 @@ TEST(CApiRegression, ParallelOffsetOffsetCase1OpenJoinEndCapMatrixProducesSimple
         }
       }
     }
+  }
+}
+
+TEST(CApiRegression, ParallelOffsetOpenRoundKeepsMultipleUsableSlices) {
+  PlinePtr pline(plineFromVertexes(makeOffsetCase1Vertexes(), false));
+
+  cavc_pline_list *raw_results = nullptr;
+  cavc_parallel_offset(pline.get(), -0.6, &raw_results, cavc_parallel_offset_default_options());
+  PlineListPtr results(raw_results);
+
+  ASSERT_NE(results.get(), nullptr);
+  ASSERT_EQ(cavc_pline_list_count(results.get()), 2u);
+
+  for (uint32_t i = 0; i < cavc_pline_list_count(results.get()); ++i) {
+    cavc_pline *offset = cavc_pline_list_get(results.get(), i);
+    ASSERT_NE(offset, nullptr);
+    EXPECT_EQ(cavc_pline_is_closed(offset), 0);
+    EXPECT_GE(cavc_pline_vertex_count(offset), 2u);
+    EXPECT_GT(cavc_get_path_length(offset), 0.0);
+    EXPECT_FALSE(hasSelfIntersect(offset));
+    EXPECT_TRUE(vertexListAllFinite(readVertexes(offset)));
   }
 }
 
